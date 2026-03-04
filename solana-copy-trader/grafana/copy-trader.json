@@ -1,0 +1,200 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "title": "Trades Total",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } },
+      "targets": [
+        {
+          "expr": "sum(copytrader_trades_total)",
+          "legendFormat": "Total Trades"
+        }
+      ]
+    },
+    {
+      "title": "Confirmed Trades",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }] } } },
+      "targets": [
+        {
+          "expr": "sum(copytrader_trades_total{status=\"confirmed\"})",
+          "legendFormat": "Confirmed"
+        }
+      ]
+    },
+    {
+      "title": "Failed Trades",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "red", "value": null }] } } },
+      "targets": [
+        {
+          "expr": "sum(copytrader_trades_total{status=\"failed\"})",
+          "legendFormat": "Failed"
+        }
+      ]
+    },
+    {
+      "title": "Open Positions",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "max": 10, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 7 }, { "color": "red", "value": 9 }] } } },
+      "targets": [
+        {
+          "expr": "copytrader_open_positions",
+          "legendFormat": "Positions"
+        }
+      ]
+    },
+    {
+      "title": "Portfolio Exposure (SOL)",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "sol", "max": 50, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 30 }, { "color": "red", "value": 45 }] } } },
+      "targets": [
+        {
+          "expr": "copytrader_portfolio_exposure_sol",
+          "legendFormat": "SOL"
+        }
+      ]
+    },
+    {
+      "title": "Stream Reconnects",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 5 }, { "color": "red", "value": 20 }] } } },
+      "targets": [
+        {
+          "expr": "copytrader_stream_reconnects_total",
+          "legendFormat": "Reconnects"
+        }
+      ]
+    },
+    {
+      "title": "Jupiter Cache Hits",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } },
+      "targets": [
+        {
+          "expr": "copytrader_jupiter_quote_cache_hits",
+          "legendFormat": "Cache Hits"
+        }
+      ]
+    },
+    {
+      "title": "Filtered Trades",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "yellow", "value": null }] } } },
+      "targets": [
+        {
+          "expr": "sum(copytrader_trades_total{status=\"filtered\"})",
+          "legendFormat": "Filtered"
+        }
+      ]
+    },
+    {
+      "title": "Trade Latency (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(copytrader_trade_latency_ms_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(copytrader_trade_latency_ms_bucket[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(copytrader_trade_latency_ms_bucket[5m]))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "title": "Simulation Latency (p50 / p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(copytrader_simulation_latency_ms_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(copytrader_simulation_latency_ms_bucket[5m]))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "title": "Slippage (bps) by DEX",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "bps" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(copytrader_slippage_bps_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(copytrader_slippage_bps_bucket[5m]))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "title": "Trades by Status (rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(copytrader_trades_total[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "title": "Trades by DEX (rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum by (dex) (rate(copytrader_trades_total[5m]))",
+          "legendFormat": "{{dex}}"
+        }
+      ]
+    },
+    {
+      "title": "Stream Lag (slots)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 20 }] } } },
+      "targets": [
+        {
+          "expr": "copytrader_stream_lag_slots",
+          "legendFormat": "Lag"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["solana", "copy-trader"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Solana Copy Trader",
+  "uid": "solana-copy-trader"
+}

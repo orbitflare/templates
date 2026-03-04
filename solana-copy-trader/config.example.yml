@@ -1,0 +1,151 @@
+# ──────────────────────────────────────────
+# Solana Copy Trader Configuration
+# ──────────────────────────────────────────
+# Environment variables are expanded: ${VAR_NAME}
+# Copy to config.yml and edit for your setup.
+
+jetstream:
+  url: "${ORBITFLARE_GRPC_ENDPOINT}"
+  timeout_secs: 30
+  tcp_keepalive_secs: 60
+  channel_buffer_size: 10000
+  reconnect:
+    initial_delay_ms: 100
+    max_delay_ms: 30000
+    multiplier: 2.0
+
+rpc:
+  url: "${ORBITFLARE_RPC_URL}"
+  timeout_secs: 10
+  max_retries: 3
+  commitment: "confirmed"
+
+# ──────────────────────────────────────────
+# Target wallets to copy
+# ──────────────────────────────────────────
+targets:
+  - address: "WhaleWallet111111111111111111111111111111111"
+    label: "whale-alpha"
+    enabled: true
+    # Override global settings per wallet
+    sizing:
+      mode: "proportional"
+      proportion: 0.05           # copy 5% of their trade size
+
+  - address: "WhaleWallet222222222222222222222222222222222"
+    label: "whale-beta"
+    enabled: true
+    sizing:
+      mode: "fixed"
+      fixed_amount_sol: 0.5
+
+# ──────────────────────────────────────────
+# Execution settings
+# ──────────────────────────────────────────
+execution:
+  dry_run: true                  # override via DRY_RUN env var or --dry-run flag
+
+  sizing:
+    mode: "fixed"                # "fixed" | "proportional" | "mirror"
+    fixed_amount_sol: 0.1        # used when mode=fixed
+    proportion: 0.1              # used when mode=proportional (10% of target trade)
+    max_trade_sol: 5.0           # hard cap regardless of mode
+    min_trade_sol: 0.01          # skip dust trades
+
+  slippage:
+    default_bps: 300             # 3% default slippage
+    max_bps: 1000                # never exceed 10%
+
+  priority_fee:
+    strategy: "dynamic"          # "fixed" | "dynamic"
+    fixed_lamports: 100000       # used when strategy=fixed
+    dynamic_percentile: 75       # recent fee percentile when strategy=dynamic
+    max_lamports: 5000000        # fee cap
+
+  jito:
+    enabled: false
+    tip_lamports: 50000
+    block_engine_url: "https://mainnet.block-engine.jito.wtf"
+
+  confirmation:
+    strategy: "poll"             # "poll" | "websocket"
+    timeout_secs: 30
+    poll_interval_ms: 500
+
+# ──────────────────────────────────────────
+# Safety filters
+# ──────────────────────────────────────────
+safety:
+  max_daily_trades: 100
+  max_hourly_trades: 20
+  cooldown_per_token_secs: 60    # don't re-buy same token within 60s
+  max_open_positions: 10
+  max_portfolio_sol: 50.0        # stop trading if total exposure exceeds this
+
+  token_filters:
+    blacklisted_tokens: []       # list of mint addresses to never trade
+    min_liquidity_sol: 10.0      # skip tokens with thin liquidity
+    require_mint_renounced: false
+    require_freeze_renounced: true
+    min_token_age_secs: 300      # skip tokens < 5 min old (rug avoidance)
+
+# ──────────────────────────────────────────
+# DEX decoder configuration
+# ──────────────────────────────────────────
+decoders:
+  jupiter:
+    enabled: true
+    program_id: "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+  raydium_amm:
+    enabled: true
+    program_id: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+  raydium_cpmm:
+    enabled: true
+    program_id: "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+  pumpfun:
+    enabled: true
+    program_id: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+
+# ──────────────────────────────────────────
+# Redis
+# ──────────────────────────────────────────
+redis:
+  url: "${REDIS_URL}"
+  prefix: "copytrader:"
+  dedup_ttl_secs: 300            # ignore duplicate tx signatures for 5 min
+  price_cache_ttl_secs: 10       # cache Jupiter quotes for 10s
+  position_sync_interval_secs: 5
+
+# ──────────────────────────────────────────
+# Observability
+# ──────────────────────────────────────────
+metrics:
+  enabled: true
+  listen: "0.0.0.0:9090"
+
+logging:
+  level: "info"                  # trace | debug | info | warn | error
+  format: "json"                 # "json" | "pretty"
+  log_transactions: true
+  log_simulations: true
+
+# ──────────────────────────────────────────
+# Notifications (optional)
+# ──────────────────────────────────────────
+notifications:
+  telegram:
+    enabled: false
+    bot_token: "${TELEGRAM_BOT_TOKEN}"
+    chat_id: "${TELEGRAM_CHAT_ID}"
+    notify_on:
+      - "trade_executed"
+      - "trade_failed"
+      - "safety_triggered"
+      - "stream_reconnect"
+
+# ──────────────────────────────────────────
+# Trade journal (optional)
+# ──────────────────────────────────────────
+journal:
+  enabled: false
+  database_url: "${DATABASE_URL}"

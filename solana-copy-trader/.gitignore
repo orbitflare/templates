@@ -1,0 +1,32 @@
+# Build artifacts
+/target/
+**/*.rs.bk
+
+# Environment and secrets
+.env
+*.json
+keys/
+!config.example.yml
+!grafana/*.json
+!migrations/*.sql
+
+# Config with real values
+config.yml
+config.test.yml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Redis
+dump.rdb

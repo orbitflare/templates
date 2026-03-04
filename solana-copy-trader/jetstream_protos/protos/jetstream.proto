@@ -1,0 +1,204 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+package jetstream;
+
+// ============= Service Definition =============
+service Jetstream {
+  // Subscribe to data streams with filtering support
+  rpc Subscribe(stream SubscribeRequest) returns (stream SubscribeUpdate) {}
+  // Subscribe to data streams with filtering support and parsed instructions
+  rpc SubscribeParsed(stream SubscribeParsedRequest) returns (stream SubscribeUpdateParsedTransaction) {}
+  // Basic ping/pong for connection testing
+  rpc Ping(PingRequest) returns (PongResponse) {}
+  // Get information about current state
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse) {}
+}
+
+// ============= Subscribe Request =============
+message SubscribeRequest {
+  map<string, SubscribeRequestFilterTransactions> transactions = 1;
+  map<string, SubscribeRequestFilterAccounts> accounts = 2;
+  optional SubscribeRequestPing ping = 4;
+}
+
+message SubscribeRequestFilterTransactions {
+  repeated string account_include = 1;
+  repeated string account_exclude = 2;
+  repeated string account_required = 3;
+}
+
+message SubscribeRequestFilterAccounts {
+  repeated string account = 1;
+  repeated string owner = 2;
+  repeated SubscribeRequestFilterAccountsFilter filters = 3;
+}
+
+message SubscribeRequestFilterAccountsFilter {
+  oneof filter {
+    SubscribeRequestFilterAccountsFilterMemcmp memcmp = 1;
+    uint64 datasize = 2;
+    SubscribeRequestFilterAccountsFilterLamports lamports = 3;
+  }
+}
+
+message SubscribeRequestFilterAccountsFilterMemcmp {
+  uint64 offset = 1;
+  oneof data {
+    bytes bytes = 2;
+    string base58 = 3;
+    string base64 = 4;
+  }
+}
+
+message SubscribeRequestFilterAccountsFilterLamports {
+  oneof cmp {
+    uint64 eq = 1;
+    uint64 ne = 2;
+    uint64 lt = 3;
+    uint64 gt = 4;
+  }
+}
+
+message SubscribeRequestPing {
+  int32 id = 1;
+}
+
+// ============= Subscribe Updates =============
+message SubscribeUpdate {
+  repeated string filters = 1;
+  google.protobuf.Timestamp created_at = 2;
+  oneof update_oneof {
+    SubscribeUpdateTransaction transaction = 3;
+    SubscribeUpdateAccount account = 4;
+    SubscribeUpdatePing ping = 5;
+    SubscribeUpdatePong pong = 6;
+  }
+}
+
+message SubscribeUpdateTransaction {
+  SubscribeUpdateTransactionInfo transaction = 1;
+  uint64 slot = 2;
+}
+
+message SubscribeUpdateTransactionInfo {
+  bytes signature = 1;
+  uint64 slot = 2;
+  uint32 num_required_signatures = 3;
+  uint32 num_readonly_signed_accounts = 4;
+  uint32 num_readonly_unsigned_accounts = 5;
+  bytes recent_blockhash = 6;
+  repeated bytes signatures = 7;
+  repeated bytes account_keys = 8;
+  repeated CompiledInstruction instructions = 9;
+  repeated MessageAddressTableLookup address_table_lookups = 10;
+}
+
+message SubscribeUpdateAccount {
+  SubscribeUpdateAccountInfo account = 1;
+  uint64 slot = 2;
+  bool is_startup = 3;
+}
+
+message SubscribeUpdateAccountInfo {
+  bytes pubkey = 1;
+  uint64 lamports = 2;
+  bytes owner = 3;
+  bool executable = 4;
+  uint64 rent_epoch = 5;
+  bytes data = 6;
+  uint64 write_version = 7;
+  optional bytes txn_signature = 8;
+}
+
+message SubscribeUpdatePing {}
+
+message SubscribeUpdatePong {
+  int32 id = 1;
+}
+
+message MessageAddressTableLookup {
+  bytes account_key = 1;
+  bytes writable_indexes = 2;
+  bytes readonly_indexes = 3;
+}
+
+message CompiledInstruction {
+  uint32 program_id_index = 1;
+  bytes accounts = 2;
+  bytes data = 3;
+}
+
+// ============= Parsed Instruction Messages =============
+message SubscribeParsedRequest {
+  optional SubscribeRequestPing ping = 1;
+}
+
+message Instruction {
+  oneof instruction_oneof {
+    Initialize initialize = 1;
+    SetParams set_params = 2;
+    Create create = 3;
+    Buy buy = 4;
+    Sell sell = 5;
+    Withdraw withdraw = 6;
+  }
+}
+
+message Initialize {}
+
+message SetParams {
+  bytes fee_recipient = 1;
+  uint64 initial_virtual_token_reserves = 2;
+  uint64 initial_virtual_sol_reserves = 3;
+  uint64 initial_real_token_reserves = 4;
+  uint64 token_total_supply = 5;
+  uint64 fee_basis_points = 6;
+}
+
+message Create {
+  string name = 1;
+  string symbol = 2;
+  string uri = 3;
+}
+
+message Buy {
+  uint64 amount = 1;
+  uint64 max_sol_cost = 2;
+}
+
+message Sell {
+  uint64 amount = 1;
+  uint64 min_sol_output = 2;
+}
+
+message Withdraw {}
+
+// For SubscribeParsed RPC
+message SubscribeUpdateParsedTransaction {
+  bytes signature = 1;
+  uint64 slot = 2;
+  SubscribeUpdateAccount account = 3;
+  bytes recent_blockhash = 4;
+  repeated bytes signatures = 5;
+  repeated Instruction instructions = 6;
+}
+
+// ============= Non-streaming Methods =============
+message PingRequest {
+  int32 count = 1;
+}
+
+message PongResponse {
+  int32 count = 1;
+}
+
+message GetVersionRequest {}
+
+message GetVersionResponse {
+  string version = 1;
+}
+
+message GetSlotResponse {
+  uint64 slot = 1;
+}
