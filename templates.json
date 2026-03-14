@@ -5,7 +5,14 @@
     "lang": "rust",
     "level": "beginner",
     "tags": ["trading", "copy-trade", "jetstream"],
-    "repo": "https://github.com/orbitflare/templates/tree/main/solana-copy-trader"
+    "repo": "https://github.com/orbitflare/templates/tree/main/solana-copy-trader",
+    "setup_steps": [
+      "cp .env.example .env",
+      "cp config.example.yml config.yml",
+      "# Edit .env with your OrbitFlare gRPC endpoint, RPC URL, and keypair path",
+      "docker compose up -d",
+      "# Or run locally: docker compose up -d redis postgres && cargo build --release"
+    ]
   },
   {
     "name": "solana-blinks-axum",
@@ -13,6 +20,11 @@
     "lang": "rust+ts",
     "level": "beginner",
     "tags": ["blinks", "actions", "axum"],
-    "repo": "https://github.com/orbitflare/templates/tree/main/solana-blinks-axum"
+    "repo": "https://github.com/orbitflare/templates/tree/main/solana-blinks-axum",
+    "setup_steps": [
+      "cp .env.example .env",
+      "# Edit .env with your RPC_URL (defaults to mainnet)",
+      "cargo run"
+    ]
   }
 ]
