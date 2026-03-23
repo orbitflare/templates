@@ -1,0 +1,62 @@
+jetstream:
+  timeout_secs: 30
+  tcp_keepalive_secs: 60
+  enabled: true
+  reconnect:
+    base_delay_ms: 1000
+    max_delay_ms: 30000
+    multiplier: 2.0
+    max_retries: 0
+  transactions:
+    account_include: []
+    account_exclude: []
+    account_required: []
+  accounts:
+    account: []
+    owner: []
+
+yellowstone:
+  timeout_secs: 30
+  tcp_keepalive_secs: 60
+  enabled: true
+  commitment: "confirmed"
+  reconnect:
+    base_delay_ms: 1000
+    max_delay_ms: 30000
+    multiplier: 2.0
+    max_retries: 0
+  slots:
+    enabled: true
+    filter_by_commitment: true
+  transactions:
+    vote: false
+    failed: null
+    account_include: []
+    account_exclude: []
+    account_required:
+      - "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+
+database:
+  max_connections: 10
+  min_connections: 2
+  run_migrations: true
+
+api:
+  default_page_limit: 50
+  max_page_limit: 500
+
+filters:
+  program_ids: []
+  accounts: []
+  exclude_vote_transactions: false
+  require_success: false
+
+batching:
+  size: 100
+  flush_interval_ms: 500
+  retry_count: 3
+  retry_delay_ms: 1000
+
+logging:
+  level: "info"
+  json: false

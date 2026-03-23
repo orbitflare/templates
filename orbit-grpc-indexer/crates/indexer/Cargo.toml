@@ -1,0 +1,23 @@
+[package]
+name = "orbit-grpc-indexer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "orbit-grpc-indexer"
+path = "src/main.rs"
+
+[dependencies]
+indexer-proto.workspace = true
+indexer-core.workspace = true
+indexer-config.workspace = true
+indexer-ingest.workspace = true
+indexer-filter.workspace = true
+indexer-db.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true

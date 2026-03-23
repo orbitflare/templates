@@ -26,5 +26,23 @@
       "# Edit .env with your RPC_URL (defaults to mainnet)",
       "cargo run"
     ]
+  },
+  {
+    "name": "orbit-grpc-indexer",
+    "description": "Dual-stream Solana transaction indexer with Jetstream + Yellowstone",
+    "lang": "rust+ts",
+    "level": "intermediate",
+    "tags": ["indexer", "grpc", "jetstream", "yellowstone", "postgres"],
+    "repo": "https://github.com/orbitflare/templates/tree/main/orbit-grpc-indexer",
+    "setup_steps": [
+      "cp .env.example .env",
+      "# Edit .env with your Jetstream, Yellowstone, and Postgres URLs",
+      "docker compose up -d",
+      "cargo run --bin orbit-grpc-indexer",
+      "# In a separate terminal:",
+      "cargo run --bin indexer-api-server",
+      "# Optional frontend:",
+      "cd frontend && npm install && npm run dev"
+    ]
   }
 ]

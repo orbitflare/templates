@@ -1,0 +1,50 @@
+[workspace]
+members = [
+    "crates/proto",
+    "crates/core",
+    "crates/config",
+    "crates/ingest",
+    "crates/filter",
+    "crates/db",
+    "crates/indexer",
+    "server",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+
+[workspace.dependencies]
+tokio = { version = "1.50.0", features = ["full"] }
+tokio-stream = "0.1.18"
+tonic = "0.14.5"
+prost = "0.14.3"
+prost-types = "0.14.3"
+tonic-prost = "0.14.5"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+serde_yml = "0.0.12"
+sea-orm = { version = "1.1.4", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-json"] }
+sqlx = { version = "0.8.5", features = ["runtime-tokio-rustls", "postgres", "chrono", "json"] }
+axum = { version = "0.8.4", features = ["ws"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.6", features = ["cors", "trace"] }
+
+dotenvy = "0.15.7"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
+thiserror = "2.0.18"
+anyhow = "1.0.100"
+async-trait = "0.1.88"
+chrono = { version = "0.4.44", features = ["serde"] }
+bs58 = "0.5.1"
+indexer-proto = { path = "crates/proto" }
+indexer-core = { path = "crates/core" }
+indexer-config = { path = "crates/config" }
+indexer-ingest = { path = "crates/ingest" }
+indexer-filter = { path = "crates/filter" }
+indexer-db = { path = "crates/db" }
+

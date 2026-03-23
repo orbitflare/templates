@@ -1,0 +1,27 @@
+[package]
+name = "indexer-api-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "indexer-api-server"
+path = "src/main.rs"
+
+[dependencies]
+indexer-core.workspace = true
+indexer-config.workspace = true
+indexer-db.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+axum.workspace = true
+tower-http.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+sqlx.workspace = true
