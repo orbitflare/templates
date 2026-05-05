@@ -1,5 +1,5 @@
 [workspace]
-members = ["jetstream_protos", "copy-trader"]
+members = ["jetstream_protos", "yellowstone_protos", "copy-trader"]
 resolver = "2"
 
 [workspace.package]

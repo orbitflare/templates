@@ -1,6 +1,8 @@
 # Solana Copy Trader
 
-Real-time Solana copy trading engine built on OrbitFlare Jetstream gRPC. Monitors target wallets, detects swap transactions across DEXs, and mirrors trades via Jupiter Swap API with configurable position sizing, safety checks, and Jito MEV protection.
+Real-time Solana copy trading engine. Monitors target wallets, detects swap transactions across DEXs, and mirrors trades via Jupiter Swap API with configurable position sizing, safety checks, and Jito MEV protection.
+
+Runs a **dual-stream** ingest: Jetstream for raw latency on direct swaps, Yellowstone gRPC for completeness (the inner-instruction CPI chain that Jetstream's shred-decoded view cannot see). Both feed a single channel with Redis dedup, so you get the speed of one and the coverage of the other.
 
 ---
 
@@ -8,8 +10,9 @@ Real-time Solana copy trading engine built on OrbitFlare Jetstream gRPC. Monitor
 
 ```mermaid
 flowchart TD
-    A[OrbitFlare Jetstream gRPC] -- gRPC stream --> B[Stream Manager]
-    B -- raw tx bytes --> C[Transaction Parser]
+    J[Jetstream gRPC<br/>fast, top-level only] --> M[Unified channel<br/>Redis dedup]
+    Y[Yellowstone gRPC<br/>complete, +CPI inner ix] --> M
+    M --> C[Decoder pipeline]
 
     C --> C1[Jupiter v6]
     C --> C2[Raydium AMM/CPMM]
@@ -33,33 +36,33 @@ flowchart TD
     H --> H3[PostgreSQL journal]
     H --> H4[Telegram]
 ```
+
+The decoder tries top-level instructions first (the path Jetstream provides). If nothing matches and the transaction came from Yellowstone with inner instructions, it walks the CPI chain - this is what catches aggregator/router swaps (Axiom, etc.) that Jetstream alone would miss.
+
 ---
 
 ## Prerequisites
 
-| Dependency       | Version  | Purpose                          |
-|------------------|----------|----------------------------------|
-| Rust             | ≥ 1.83   | Build toolchain                  |
-| Docker & Compose | ≥ 24.0   | Container orchestration          |
-| OrbitFlare key   | —        | Jetstream gRPC + RPC endpoints   |
-| Solana keypair   | —        | Trader wallet (signs transactions)|
+| Dependency               | Version  | Purpose                                              |
+|--------------------------|----------|------------------------------------------------------|
+| Rust                     | ≥ 1.83   | Build toolchain                                      |
+| Docker & Compose         | ≥ 24.0   | Container orchestration                              |
+| OrbitFlare account       | —        | RPC API key (URL `?api_key=`); gRPC URLs for Jetstream and Yellowstone |
+| Solana keypair           | —        | Trader wallet (signs transactions)                   |
 
-Get a Jetstream endpoint and RPC URL from [OrbitFlare](https://orbitflare.com/login):
+Grab Jetstream and Yellowstone gRPC URLs from [OrbitFlare](https://orbitflare.com/login).
 
-| Region    | Jetstream Endpoint                          |
-|-----------|---------------------------------------------|
-| Frankfurt | `http://fra.jetstream.orbitflare.com`       |
-| Tokyo     | `http://jp.jetstream.orbitflare.com`        |
-(and others)
+Yellowstone is required for full coverage. Set `yellowstone.enabled: false` in config only if you knowingly accept missing CPI-routed trades.
 
 ---
 
 ## Quick Start
 
-### 1. Clone and configure
+### 1. Install and scaffold
 
 ```bash
-git clone https://github.com/orbitflare/solana-copy-trader.git
+cargo install orbitflare
+orbitflare template --install solana-copy-trader
 cd solana-copy-trader
 cp .env.example .env
 cp config.example.yml config.yml
@@ -70,12 +73,13 @@ Edit `.env`:
 ```env
 ORBITFLARE_GRPC_ENDPOINT=http://fra.jetstream.orbitflare.com
 ORBITFLARE_RPC_URL=https://rpc.orbitflare.com/v1/YOUR_API_KEY
+YELLOWSTONE_GRPC_ENDPOINT=http://fra.yellowstone.orbitflare.com
 TRADER_KEYPAIR_PATH=/keys/trader.json
 REDIS_URL=redis://redis:6379
 DATABASE_URL=postgres://copytrader:password@postgres:5432/copytrader
-TELEGRAM_BOT_TOKEN=           # optional
-TELEGRAM_CHAT_ID=             # optional
 ```
+
+Telegram push notifications are optional. Enable them by setting `notifications.telegram.enabled: true` in `config.yml` and adding `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` to `.env`.
 
 ### 2. Run with Docker Compose
 
@@ -157,8 +161,10 @@ Exposed on `:9090/metrics` when `metrics.enabled = true`.
 | `copytrader_slippage_bps`                  | Histogram | `dex`                      | Actual slippage observed on filled trades  |
 | `copytrader_open_positions`                | Gauge     | —                          | Current open position count                |
 | `copytrader_portfolio_exposure_sol`        | Gauge     | —                          | Total SOL value in open positions          |
-| `copytrader_stream_reconnects_total`       | Counter   | —                          | gRPC stream reconnection count             |
-| `copytrader_stream_lag_slots`              | Gauge     | —                          | Slots behind tip                           |
+| `copytrader_stream_reconnects_total`       | Counter   | —                          | Jetstream reconnection count               |
+| `copytrader_yellowstone_reconnects_total`  | Counter   | —                          | Yellowstone reconnection count             |
+| `copytrader_stream_lag_slots`              | Gauge     | —                          | Slots behind tip (Jetstream)               |
+| `copytrader_cpi_swaps_detected_total`      | Counter   | —                          | Swaps decoded from inner instructions only (Yellowstone wins these) |
 | `copytrader_jupiter_quote_cache_hits`      | Counter   | —                          | Redis price cache hit count                |
 
 ### Grafana dashboard
@@ -167,23 +173,12 @@ Import `grafana/copy-trader.json` for a pre-built dashboard covering trade activ
 
 ---
 
-### Graceful shutdown
-
-The copy trader handles `SIGTERM` / `SIGINT`:
-
-1. Stops accepting new trade intents from the stream
-2. Waits for in-flight transactions to confirm or timeout
-3. Flushes pending journal writes to PostgreSQL
-4. Publishes a shutdown event to Redis pub/sub
-5. Exits with code 0
-
----
-
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `stream disconnected, reconnecting...` every few seconds | Jetstream endpoint overloaded or network issue | Switch region, check OrbitFlare status page, verify firewall allows gRPC |
+| Trades from aggregators (Axiom, Jupiter routes) never appear | Yellowstone disabled, only Jetstream running | Set `yellowstone.enabled: true` and configure `YELLOWSTONE_GRPC_ENDPOINT` |
 | `simulation failed: InsufficientFunds` | Trader wallet is out of SOL | Top up wallet, reduce `max_trade_sol` |
 | `simulation failed: SlippageExceeded` | Price moved between quote and simulation | Increase `slippage.default_bps`, enable Jito bundles |
 | `trade_filtered: min_liquidity` on every token | Liquidity threshold too high | Lower `min_liquidity_sol` |

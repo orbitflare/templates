@@ -70,6 +70,8 @@ pub enum LogFormat {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub jetstream: JetstreamConfig,
+    #[serde(default)]
+    pub yellowstone: YellowstoneConfig,
     pub rpc: RpcConfig,
     #[serde(default)]
     pub targets: Vec<TargetConfig>,
@@ -103,6 +105,35 @@ pub struct JetstreamConfig {
 impl Default for JetstreamConfig {
     fn default() -> Self {
         Self {
+            url: String::new(),
+            timeout_secs: 30,
+            tcp_keepalive_secs: 60,
+            channel_buffer_size: 10000,
+            reconnect: ReconnectConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct YellowstoneConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub timeout_secs: u64,
+    #[serde(default)]
+    pub tcp_keepalive_secs: u64,
+    #[serde(default)]
+    pub channel_buffer_size: usize,
+    #[serde(default)]
+    pub reconnect: ReconnectConfig,
+}
+
+impl Default for YellowstoneConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
             url: String::new(),
             timeout_secs: 30,
             tcp_keepalive_secs: 60,
@@ -512,8 +543,12 @@ pub fn apply_cli_overrides(mut config: AppConfig, cli: &Cli) -> AppConfig {
 }
 
 pub fn validate_config(config: &AppConfig) -> anyhow::Result<()> {
-    if config.jetstream.url.is_empty() {
-        anyhow::bail!("jetstream.url is required");
+    let jetstream_enabled = !config.jetstream.url.is_empty();
+    let yellowstone_enabled = config.yellowstone.enabled && !config.yellowstone.url.is_empty();
+    if !jetstream_enabled && !yellowstone_enabled {
+        anyhow::bail!(
+            "at least one stream must be configured: set jetstream.url, or yellowstone.enabled=true with yellowstone.url"
+        );
     }
     if config.rpc.url.is_empty() {
         anyhow::bail!("rpc.url is required");
@@ -535,8 +570,18 @@ pub fn validate_config(config: &AppConfig) -> anyhow::Result<()> {
     if config.execution.sizing.min_trade_sol <= 0.0 {
         anyhow::bail!("execution.sizing.min_trade_sol must be positive");
     }
+    if config.yellowstone.enabled && config.yellowstone.url.is_empty() {
+        anyhow::bail!("yellowstone.url is required when yellowstone.enabled = true");
+    }
 
     tracing::info!("Configuration validated successfully");
+    let mode = match (jetstream_enabled, yellowstone_enabled) {
+        (true, true) => "dual-stream (Jetstream + Yellowstone)",
+        (true, false) => "Jetstream only (CPI swaps will be missed)",
+        (false, true) => "Yellowstone only",
+        (false, false) => unreachable!(),
+    };
+    tracing::info!("  Stream mode: {}", mode);
     tracing::info!("  Targets: {}", config.targets.len());
     tracing::info!("  Dry run: {}", config.execution.dry_run);
     tracing::info!("  Sizing mode: {:?}", config.execution.sizing.mode);

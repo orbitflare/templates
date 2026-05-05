@@ -1,10 +1,9 @@
 pub mod jupiter;
-pub mod raydium;
 pub mod pumpfun;
+pub mod raydium;
 
 use crate::config::AppConfig;
-use crate::types::{Dex, TradeIntent};
-use jetstream_protos::jetstream::SubscribeUpdateTransactionInfo;
+use crate::types::{Dex, RawTransaction, TradeIntent};
 use solana_sdk::pubkey::Pubkey;
 use std::sync::Arc;
 
@@ -78,26 +77,8 @@ impl DecoderPipeline {
         Self { decoders, config }
     }
 
-    pub fn decode_transaction(
-        &self,
-        tx_info: &SubscribeUpdateTransactionInfo,
-    ) -> Vec<TradeIntent> {
-        let signature = bs58::encode(&tx_info.signature).into_string();
-
-        let accounts: Vec<Pubkey> = tx_info
-            .account_keys
-            .iter()
-            .filter_map(|bytes| {
-                if bytes.len() == 32 {
-                    let mut array = [0u8; 32];
-                    array.copy_from_slice(bytes);
-                    Some(Pubkey::new_from_array(array))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
+    pub fn decode_transaction(&self, tx: &RawTransaction) -> Vec<TradeIntent> {
+        let accounts = &tx.account_keys;
         if accounts.is_empty() {
             return vec![];
         }
@@ -113,26 +94,58 @@ impl DecoderPipeline {
 
         let mut intents = Vec::new();
 
-        for instruction in &tx_info.instructions {
+        for instruction in &tx.instructions {
             let program_idx = instruction.program_id_index as usize;
             let Some(program_id) = accounts.get(program_idx) else {
                 continue;
             };
 
-            let ix_account_indices: &[u8] = &instruction.accounts;
-
             for decoder in &self.decoders {
                 if *program_id == decoder.program_id() {
                     if let Some(intent) = decoder.decode(
-                        &accounts,
-                        ix_account_indices,
+                        accounts,
+                        &instruction.accounts,
                         &instruction.data,
                         signer,
                         wallet_label,
-                        &signature,
-                        tx_info.slot,
+                        &tx.signature,
+                        tx.slot,
                     ) {
                         intents.push(intent);
+                    }
+                }
+            }
+        }
+
+        if intents.is_empty() && !tx.inner_instructions.is_empty() {
+            for inner_set in &tx.inner_instructions {
+                for inner_ix in &inner_set.instructions {
+                    let program_idx = inner_ix.program_id_index as usize;
+                    let Some(program_id) = accounts.get(program_idx) else {
+                        continue;
+                    };
+
+                    for decoder in &self.decoders {
+                        if *program_id == decoder.program_id() {
+                            if let Some(intent) = decoder.decode(
+                                accounts,
+                                &inner_ix.accounts,
+                                &inner_ix.data,
+                                signer,
+                                wallet_label,
+                                &tx.signature,
+                                tx.slot,
+                            ) {
+                                tracing::info!(
+                                    dex = %intent.dex,
+                                    direction = %intent.direction,
+                                    source = %tx.source,
+                                    outer_ix_index = inner_set.index,
+                                    "Decoded CPI swap from inner instruction"
+                                );
+                                intents.push(intent);
+                            }
+                        }
                     }
                 }
             }

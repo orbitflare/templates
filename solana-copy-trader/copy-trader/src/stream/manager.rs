@@ -1,9 +1,11 @@
 use crate::config::AppConfig;
-use crate::stream::filter::build_subscription_filters;
+use crate::stream::filter::build_jetstream_filters;
+use crate::types::{DetectionSource, RawInstruction, RawTransaction};
 use jetstream_protos::jetstream::{
     jetstream_client::JetstreamClient, subscribe_update::UpdateOneof, SubscribeRequest,
     SubscribeRequestPing, SubscribeUpdateTransactionInfo,
 };
+use solana_sdk::pubkey::Pubkey;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,7 +15,7 @@ use tonic::transport::Channel;
 
 pub struct StreamManager {
     config: Arc<AppConfig>,
-    tx: mpsc::Sender<SubscribeUpdateTransactionInfo>,
+    tx: mpsc::Sender<RawTransaction>,
     shutdown_rx: watch::Receiver<bool>,
     reconnect_counter: prometheus::IntCounter,
     slot_lag_gauge: prometheus::IntGauge,
@@ -23,7 +25,7 @@ pub struct StreamManager {
 impl StreamManager {
     pub fn new(
         config: Arc<AppConfig>,
-        tx: mpsc::Sender<SubscribeUpdateTransactionInfo>,
+        tx: mpsc::Sender<RawTransaction>,
         shutdown_rx: watch::Receiver<bool>,
         reconnect_counter: prometheus::IntCounter,
         slot_lag_gauge: prometheus::IntGauge,
@@ -43,23 +45,23 @@ impl StreamManager {
 
         loop {
             if *self.shutdown_rx.borrow() {
-                tracing::info!("StreamManager shutting down");
+                tracing::info!("Jetstream StreamManager shutting down");
                 return Ok(());
             }
 
             match self.connect_and_stream().await {
                 Ok(()) => {
-                    tracing::info!("Stream ended normally");
+                    tracing::info!("Jetstream stream ended normally");
                     return Ok(());
                 }
                 Err(e) => {
-                    tracing::error!(error = %e, delay_ms, "Stream disconnected, reconnecting...");
+                    tracing::error!(error = %e, delay_ms, "Jetstream disconnected, reconnecting...");
                     self.reconnect_counter.inc();
 
                     tokio::select! {
                         _ = tokio::time::sleep(Duration::from_millis(delay_ms)) => {}
                         _ = self.shutdown_rx.changed() => {
-                            tracing::info!("StreamManager shutting down during reconnect backoff");
+                            tracing::info!("Jetstream StreamManager shutting down during reconnect backoff");
                             return Ok(());
                         }
                     }
@@ -83,7 +85,7 @@ impl StreamManager {
             .await?;
 
         let mut client = JetstreamClient::new(channel);
-        let filters = build_subscription_filters(&self.config);
+        let filters = build_jetstream_filters(&self.config);
 
         tracing::info!(filter_count = filters.len(), "Subscribing to Jetstream");
 
@@ -116,8 +118,9 @@ impl StreamManager {
                                     }
 
                                     if let Some(tx_info) = tx_update.transaction {
-                                        if self.tx.try_send(tx_info).is_err() {
-                                            tracing::warn!("Transaction channel full, dropping transaction");
+                                        let raw = convert_jetstream_tx(tx_info);
+                                        if self.tx.try_send(raw).is_err() {
+                                            tracing::warn!("Transaction channel full, dropping Jetstream tx");
                                         }
                                     }
                                 }
@@ -131,18 +134,55 @@ impl StreamManager {
                             }
                         }
                         Some(Err(e)) => {
-                            return Err(anyhow::anyhow!("Stream error: {}", e));
+                            return Err(anyhow::anyhow!("Jetstream stream error: {}", e));
                         }
                         None => {
-                            return Err(anyhow::anyhow!("Stream ended unexpectedly"));
+                            return Err(anyhow::anyhow!("Jetstream stream ended unexpectedly"));
                         }
                     }
                 }
                 _ = self.shutdown_rx.changed() => {
-                    tracing::info!("StreamManager received shutdown signal");
+                    tracing::info!("Jetstream StreamManager received shutdown signal");
                     return Ok(());
                 }
             }
         }
+    }
+}
+
+fn convert_jetstream_tx(tx_info: SubscribeUpdateTransactionInfo) -> RawTransaction {
+    let signature = bs58::encode(&tx_info.signature).into_string();
+
+    let account_keys: Vec<Pubkey> = tx_info
+        .account_keys
+        .iter()
+        .filter_map(|bytes| {
+            if bytes.len() == 32 {
+                let mut array = [0u8; 32];
+                array.copy_from_slice(bytes);
+                Some(Pubkey::new_from_array(array))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let instructions: Vec<RawInstruction> = tx_info
+        .instructions
+        .iter()
+        .map(|ix| RawInstruction {
+            program_id_index: ix.program_id_index,
+            accounts: ix.accounts.to_vec(),
+            data: ix.data.to_vec(),
+        })
+        .collect();
+
+    RawTransaction {
+        signature,
+        slot: tx_info.slot,
+        account_keys,
+        instructions,
+        inner_instructions: Vec::new(),
+        source: DetectionSource::Jetstream,
     }
 }

@@ -7,7 +7,8 @@ use copy_trader::output::metrics::{self, Metrics};
 use copy_trader::output::telegram::TelegramNotifier;
 use copy_trader::state::redis::RedisClient;
 use copy_trader::stream::manager::StreamManager;
-use copy_trader::types::{TradeIntent, TradeRecord};
+use copy_trader::stream::yellowstone::YellowstoneManager;
+use copy_trader::types::{DetectionSource, RawTransaction, TradeIntent, TradeRecord};
 use solana_sdk::signature::{Keypair, Signer};
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
@@ -112,36 +113,62 @@ async fn main() -> anyhow::Result<()> {
         Some(Arc::new(kp))
     };
 
-    let (tx_sender, tx_receiver) = mpsc::channel(config.jetstream.channel_buffer_size);
+    let (tx_sender, tx_receiver) = mpsc::channel::<RawTransaction>(config.jetstream.channel_buffer_size);
     let (intent_sender, intent_receiver) = mpsc::channel::<TradeIntent>(1000);
     let (record_sender, record_receiver) = mpsc::channel::<TradeRecord>(1000);
 
+    let jetstream_sender = tx_sender.clone();
     let mut stream_mgr = StreamManager::new(
         config.clone(),
-        tx_sender,
+        jetstream_sender,
         shutdown_rx.clone(),
         metrics.stream_reconnects.clone(),
         metrics.stream_lag_slots.clone(),
     );
     let stream_handle = tokio::spawn(async move {
         if let Err(e) = stream_mgr.run().await {
-            tracing::error!(error = %e, "StreamManager exited with error");
+            tracing::error!(error = %e, "Jetstream StreamManager exited with error");
         }
     });
 
+    let yellowstone_handle = if config.yellowstone.enabled {
+        let ys_sender = tx_sender.clone();
+        let mut ys_mgr = YellowstoneManager::new(
+            config.clone(),
+            ys_sender,
+            shutdown_rx.clone(),
+            metrics.yellowstone_reconnects.clone(),
+        );
+        let handle = tokio::spawn(async move {
+            if let Err(e) = ys_mgr.run().await {
+                tracing::error!(error = %e, "Yellowstone manager exited with error");
+            }
+        });
+        tracing::info!("Dual-stream mode: Jetstream (fast) + Yellowstone (CPI-complete)");
+        Some(handle)
+    } else {
+        tracing::info!("Single-stream mode: Jetstream only (enable yellowstone for CPI detection)");
+        None
+    };
+
+    drop(tx_sender);
+
     let decoder_pipeline = DecoderPipeline::from_config(config.clone());
     let decoder_redis = redis.clone();
+    let decoder_metrics = metrics.clone();
     let mut decoder_shutdown = shutdown_rx.clone();
     let decoder_handle = tokio::spawn(async move {
         let mut rx = tx_receiver;
         loop {
             tokio::select! {
-                Some(tx_info) = rx.recv() => {
-                    let sig = bs58::encode(&tx_info.signature).into_string();
-
-                    match decoder_redis.check_dedup(&sig).await {
+                Some(raw_tx) = rx.recv() => {
+                    match decoder_redis.check_dedup(&raw_tx.signature).await {
                         Ok(true) => {
-                            tracing::trace!(sig, "Duplicate transaction, skipping");
+                            tracing::trace!(
+                                sig = %raw_tx.signature,
+                                source = %raw_tx.source,
+                                "Duplicate transaction, skipping"
+                            );
                             continue;
                         }
                         Ok(false) => {}
@@ -150,7 +177,24 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
 
-                    let intents = decoder_pipeline.decode_transaction(&tx_info);
+                    let source = raw_tx.source;
+                    let has_inner = !raw_tx.inner_instructions.is_empty();
+                    let intents = decoder_pipeline.decode_transaction(&raw_tx);
+
+                    for intent in &intents {
+                        if source == DetectionSource::Yellowstone && has_inner {
+                            decoder_metrics.cpi_swaps_detected.inc();
+                        }
+                        tracing::info!(
+                            source = %source,
+                            dex = %intent.dex,
+                            direction = %intent.direction,
+                            wallet = %intent.wallet,
+                            sig = %raw_tx.signature,
+                            "Trade intent detected"
+                        );
+                    }
+
                     for intent in intents {
                         if intent_sender.send(intent).await.is_err() {
                             tracing::warn!("Intent channel closed");
@@ -257,10 +301,15 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(
         dry_run = config.execution.dry_run,
         targets = config.targets.len(),
+        yellowstone = config.yellowstone.enabled,
         "Copy trader running — press Ctrl+C to stop"
     );
 
     let _ = tokio::join!(stream_handle, decoder_handle, engine_handle, tee_handle);
+
+    if let Some(handle) = yellowstone_handle {
+        let _ = handle.await;
+    }
 
     if let Some((jh, _)) = journal_handle {
         let _ = jh.await;

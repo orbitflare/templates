@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 jetstream_protos = { path = "../jetstream_protos" }
+yellowstone_protos = { path = "../yellowstone_protos" }
 
 # Async runtime
 tokio.workspace = true

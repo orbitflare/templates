@@ -25,6 +25,8 @@ pub struct Metrics {
     pub portfolio_exposure: Gauge,
     pub stream_reconnects: IntCounter,
     pub stream_lag_slots: IntGauge,
+    pub yellowstone_reconnects: IntCounter,
+    pub cpi_swaps_detected: IntCounter,
     pub jupiter_cache_hits: IntCounter,
 }
 
@@ -97,12 +99,30 @@ impl Metrics {
         ))
         .unwrap();
 
+        let yellowstone_reconnects = IntCounter::with_opts(Opts::new(
+            "copytrader_yellowstone_reconnects_total",
+            "Yellowstone gRPC stream reconnection count",
+        ))
+        .unwrap();
+
+        let cpi_swaps_detected = IntCounter::with_opts(Opts::new(
+            "copytrader_cpi_swaps_detected_total",
+            "Swaps detected via CPI inner instructions (Yellowstone only)",
+        ))
+        .unwrap();
+
         let jupiter_cache_hits = IntCounter::with_opts(Opts::new(
             "copytrader_jupiter_quote_cache_hits",
             "Redis price cache hit count",
         ))
         .unwrap();
 
+        registry
+            .register(Box::new(yellowstone_reconnects.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(cpi_swaps_detected.clone()))
+            .unwrap();
         registry.register(Box::new(trades_total.clone())).unwrap();
         registry.register(Box::new(trade_latency.clone())).unwrap();
         registry
@@ -135,6 +155,8 @@ impl Metrics {
             portfolio_exposure,
             stream_reconnects,
             stream_lag_slots,
+            yellowstone_reconnects,
+            cpi_swaps_detected,
             jupiter_cache_hits,
         }
     }

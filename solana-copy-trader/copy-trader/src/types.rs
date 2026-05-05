@@ -5,6 +5,37 @@ use strum::Display;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum DetectionSource {
+    Jetstream,
+    Yellowstone,
+}
+
+#[derive(Debug, Clone)]
+pub struct RawTransaction {
+    pub signature: String,
+    pub slot: u64,
+    pub account_keys: Vec<Pubkey>,
+    pub instructions: Vec<RawInstruction>,
+    pub inner_instructions: Vec<InnerInstructionSet>,
+    pub source: DetectionSource,
+}
+
+#[derive(Debug, Clone)]
+pub struct RawInstruction {
+    pub program_id_index: u32,
+    pub accounts: Vec<u8>,
+    pub data: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct InnerInstructionSet {
+    pub index: u32,
+    pub instructions: Vec<RawInstruction>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
+#[serde(rename_all = "snake_case")]
 pub enum Dex {
     #[strum(serialize = "jupiter_v6")]
     JupiterV6,
