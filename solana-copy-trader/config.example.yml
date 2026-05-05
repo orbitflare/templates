@@ -2,7 +2,7 @@
 # Copy to config.yml and edit for your setup.
 
 jetstream:
-  url: "${ORBITFLARE_GRPC_ENDPOINT}"
+  url: "${JETSTREAM_GRPC_ENDPOINT}"
   timeout_secs: 30
   tcp_keepalive_secs: 60
   channel_buffer_size: 10000

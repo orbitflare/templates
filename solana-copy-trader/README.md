@@ -71,9 +71,9 @@ cp config.example.yml config.yml
 Edit `.env`:
 
 ```env
-ORBITFLARE_GRPC_ENDPOINT=http://fra.jetstream.orbitflare.com
-ORBITFLARE_RPC_URL=https://rpc.orbitflare.com/v1/YOUR_API_KEY
-YELLOWSTONE_GRPC_ENDPOINT=http://fra.yellowstone.orbitflare.com
+JETSTREAM_GRPC_ENDPOINT=http://fra.jetstream.orbitflare.com
+YELLOWSTONE_GRPC_ENDPOINT=http://fra.rpc.orbitflare.com:10000
+ORBITFLARE_RPC_URL=http://fra.rpc.orbitflare.com?api_key=YOUR_API_KEY
 TRADER_KEYPAIR_PATH=/keys/trader.json
 REDIS_URL=redis://redis:6379
 DATABASE_URL=postgres://copytrader:password@postgres:5432/copytrader
