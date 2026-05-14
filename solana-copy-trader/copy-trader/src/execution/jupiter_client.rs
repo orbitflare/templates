@@ -100,12 +100,7 @@ impl JupiterClient {
             "prioritizationFeeLamports": priority_fee_value
         });
 
-        let resp = self
-            .http
-            .post(JUPITER_SWAP_URL)
-            .json(&body)
-            .send()
-            .await?;
+        let resp = self.http.post(JUPITER_SWAP_URL).json(&body).send().await?;
 
         if !resp.status().is_success() {
             let status = resp.status();

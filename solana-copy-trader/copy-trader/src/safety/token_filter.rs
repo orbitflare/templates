@@ -143,25 +143,21 @@ impl TokenFilter {
             .and_then(|d| d.get("parsed"))
             .and_then(|p| p.get("info"))?;
 
-        let mint_authority = info
-            .get("mintAuthority")
-            .and_then(|v| {
-                if v.is_null() {
-                    None
-                } else {
-                    v.as_str().map(|s| s.to_string())
-                }
-            });
+        let mint_authority = info.get("mintAuthority").and_then(|v| {
+            if v.is_null() {
+                None
+            } else {
+                v.as_str().map(|s| s.to_string())
+            }
+        });
 
-        let freeze_authority = info
-            .get("freezeAuthority")
-            .and_then(|v| {
-                if v.is_null() {
-                    None
-                } else {
-                    v.as_str().map(|s| s.to_string())
-                }
-            });
+        let freeze_authority = info.get("freezeAuthority").and_then(|v| {
+            if v.is_null() {
+                None
+            } else {
+                v.as_str().map(|s| s.to_string())
+            }
+        });
 
         Some(MintInfo {
             mint_authority,

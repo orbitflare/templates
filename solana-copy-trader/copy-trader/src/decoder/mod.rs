@@ -58,7 +58,10 @@ impl DecoderPipeline {
                 decoders.push(Box::new(raydium::RaydiumCpmmDecoder::new(pubkey)));
                 tracing::info!(program_id = pid, "Raydium CPMM decoder enabled");
             } else {
-                tracing::warn!(program_id = pid, "Invalid Raydium CPMM program ID, skipping");
+                tracing::warn!(
+                    program_id = pid,
+                    "Invalid Raydium CPMM program ID, skipping"
+                );
             }
         }
 
@@ -72,7 +75,10 @@ impl DecoderPipeline {
             }
         }
 
-        tracing::info!(decoder_count = decoders.len(), "DecoderPipeline initialized");
+        tracing::info!(
+            decoder_count = decoders.len(),
+            "DecoderPipeline initialized"
+        );
 
         Self { decoders, config }
     }

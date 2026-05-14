@@ -116,33 +116,32 @@ impl DexDecoder for RaydiumAmmDecoder {
         let dest_mint = cache.get(&user_dest).copied();
         drop(cache);
 
-        let swapping_coin_to_pc = user_source == pool_coin
-            || cache_matches_pool(&source_mint, &pool_coin);
+        let swapping_coin_to_pc =
+            user_source == pool_coin || cache_matches_pool(&source_mint, &pool_coin);
 
-        let (input_mint, output_mint, direction) = if let (Some(src_m), Some(dst_m)) =
-            (source_mint, dest_mint)
-        {
-            let dir = if src_m == sol_mint || src_m == wsol {
-                Direction::Buy
-            } else if dst_m == sol_mint || dst_m == wsol || swapping_coin_to_pc {
-                Direction::Sell
+        let (input_mint, output_mint, direction) =
+            if let (Some(src_m), Some(dst_m)) = (source_mint, dest_mint) {
+                let dir = if src_m == sol_mint || src_m == wsol {
+                    Direction::Buy
+                } else if dst_m == sol_mint || dst_m == wsol || swapping_coin_to_pc {
+                    Direction::Sell
+                } else {
+                    Direction::Buy
+                };
+                (src_m, dst_m, dir)
             } else {
-                Direction::Buy
-            };
-            (src_m, dst_m, dir)
-        } else {
-            let dir = if swapping_coin_to_pc {
-                Direction::Sell
-            } else {
-                Direction::Buy
-            };
+                let dir = if swapping_coin_to_pc {
+                    Direction::Sell
+                } else {
+                    Direction::Buy
+                };
 
-            if swapping_coin_to_pc {
-                (pool_coin, pool_pc, dir)
-            } else {
-                (pool_pc, pool_coin, dir)
-            }
-        };
+                if swapping_coin_to_pc {
+                    (pool_coin, pool_pc, dir)
+                } else {
+                    (pool_pc, pool_coin, dir)
+                }
+            };
 
         tracing::info!(
             dex = "raydium_amm",

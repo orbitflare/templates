@@ -1,9 +1,9 @@
 use crate::config::AppConfig;
+use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signature::{Keypair, Signer};
 #[allow(deprecated)]
 use solana_sdk::system_instruction;
-use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transaction::Transaction;
-use solana_sdk::pubkey::Pubkey;
 use std::sync::Arc;
 
 const JITO_TIP_ACCOUNTS: &[&str] = &[
@@ -41,8 +41,7 @@ impl JitoClient {
         keypair: &Keypair,
         recent_blockhash: solana_sdk::hash::Hash,
     ) -> Transaction {
-        let tip_account_str =
-            JITO_TIP_ACCOUNTS[fastrand::usize(..JITO_TIP_ACCOUNTS.len())];
+        let tip_account_str = JITO_TIP_ACCOUNTS[fastrand::usize(..JITO_TIP_ACCOUNTS.len())];
         let tip_account: Pubkey = tip_account_str.parse().unwrap();
 
         let instruction = system_instruction::transfer(
@@ -66,15 +65,16 @@ impl JitoClient {
             anyhow::bail!("Jito is not enabled");
         }
 
-        let url = format!("{}/api/v1/bundles", self.config.execution.jito.block_engine_url);
+        let url = format!(
+            "{}/api/v1/bundles",
+            self.config.execution.jito.block_engine_url
+        );
 
         let tip_tx = self.build_tip_transaction(keypair, recent_blockhash);
         let tip_tx_bytes = bincode::serialize(&tip_tx)
             .map_err(|e| anyhow::anyhow!("Failed to serialize tip tx: {}", e))?;
-        let tip_tx_base64 = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            &tip_tx_bytes,
-        );
+        let tip_tx_base64 =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &tip_tx_bytes);
 
         let body = serde_json::json!({
             "jsonrpc": "2.0",
@@ -97,10 +97,7 @@ impl JitoClient {
             anyhow::bail!("Jito error: {}", error);
         }
 
-        let bundle_id = json["result"]
-            .as_str()
-            .unwrap_or("unknown")
-            .to_string();
+        let bundle_id = json["result"].as_str().unwrap_or("unknown").to_string();
 
         tracing::info!(
             bundle_id = %bundle_id,

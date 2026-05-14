@@ -51,7 +51,9 @@ impl Metrics {
                 "copytrader_trade_latency_ms",
                 "End-to-end latency (detect → confirm)",
             )
-            .buckets(vec![50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0]),
+            .buckets(vec![
+                50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0,
+            ]),
             &["target", "dex"],
         )
         .unwrap();
@@ -93,11 +95,9 @@ impl Metrics {
         ))
         .unwrap();
 
-        let stream_lag_slots = IntGauge::with_opts(Opts::new(
-            "copytrader_stream_lag_slots",
-            "Slots behind tip",
-        ))
-        .unwrap();
+        let stream_lag_slots =
+            IntGauge::with_opts(Opts::new("copytrader_stream_lag_slots", "Slots behind tip"))
+                .unwrap();
 
         let yellowstone_reconnects = IntCounter::with_opts(Opts::new(
             "copytrader_yellowstone_reconnects_total",
@@ -129,9 +129,7 @@ impl Metrics {
             .register(Box::new(simulation_latency.clone()))
             .unwrap();
         registry.register(Box::new(slippage_bps.clone())).unwrap();
-        registry
-            .register(Box::new(open_positions.clone()))
-            .unwrap();
+        registry.register(Box::new(open_positions.clone())).unwrap();
         registry
             .register(Box::new(portfolio_exposure.clone()))
             .unwrap();

@@ -24,8 +24,7 @@ async fn main() -> anyhow::Result<()> {
         _ => "trace",
     };
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(log_level));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
     let log_format = std::fs::read_to_string(&cli.config)
         .ok()
@@ -97,8 +96,8 @@ async fn main() -> anyhow::Result<()> {
     let redis = Arc::new(RedisClient::connect(config.clone()).await?);
 
     let keypair = if !config.execution.dry_run {
-        let keypair_path = std::env::var("TRADER_KEYPAIR_PATH")
-            .unwrap_or_else(|_| "trader.json".to_string());
+        let keypair_path =
+            std::env::var("TRADER_KEYPAIR_PATH").unwrap_or_else(|_| "trader.json".to_string());
         let keypair_data = std::fs::read_to_string(&keypair_path)
             .map_err(|e| anyhow::anyhow!("Failed to read keypair from {}: {}", keypair_path, e))?;
         let keypair_bytes: Vec<u8> = serde_json::from_str(&keypair_data)?;
@@ -113,7 +112,8 @@ async fn main() -> anyhow::Result<()> {
         Some(Arc::new(kp))
     };
 
-    let (tx_sender, tx_receiver) = mpsc::channel::<RawTransaction>(config.jetstream.channel_buffer_size);
+    let (tx_sender, tx_receiver) =
+        mpsc::channel::<RawTransaction>(config.jetstream.channel_buffer_size);
     let (intent_sender, intent_receiver) = mpsc::channel::<TradeIntent>(1000);
     let (record_sender, record_receiver) = mpsc::channel::<TradeRecord>(1000);
 
@@ -122,7 +122,6 @@ async fn main() -> anyhow::Result<()> {
         config.clone(),
         jetstream_sender,
         shutdown_rx.clone(),
-        metrics.stream_reconnects.clone(),
         metrics.stream_lag_slots.clone(),
     );
     let stream_handle = tokio::spawn(async move {
@@ -133,12 +132,7 @@ async fn main() -> anyhow::Result<()> {
 
     let yellowstone_handle = if config.yellowstone.enabled {
         let ys_sender = tx_sender.clone();
-        let mut ys_mgr = YellowstoneManager::new(
-            config.clone(),
-            ys_sender,
-            shutdown_rx.clone(),
-            metrics.yellowstone_reconnects.clone(),
-        );
+        let mut ys_mgr = YellowstoneManager::new(config.clone(), ys_sender, shutdown_rx.clone());
         let handle = tokio::spawn(async move {
             if let Err(e) = ys_mgr.run().await {
                 tracing::error!(error = %e, "Yellowstone manager exited with error");

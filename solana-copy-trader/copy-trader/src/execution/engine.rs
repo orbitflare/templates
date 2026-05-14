@@ -111,7 +111,14 @@ impl ExecutionEngine {
                 .with_label_values(&[target_wallet.as_str(), "filtered", dex_label.as_str()])
                 .inc();
 
-            let record = self.build_record(&intent, TradeStatus::Filtered, Some(e.to_string()), None, &target_wallet, start);
+            let record = self.build_record(
+                &intent,
+                TradeStatus::Filtered,
+                Some(e.to_string()),
+                None,
+                &target_wallet,
+                start,
+            );
             let _ = self.record_tx.send(record).await;
             return;
         }
@@ -138,10 +145,20 @@ impl ExecutionEngine {
                 .with_label_values(&[target_wallet.as_str(), "simulated", dex_label.as_str()])
                 .inc();
 
-            let record = self.build_record(&intent, TradeStatus::Simulated, None, None, &target_wallet, start);
+            let record = self.build_record(
+                &intent,
+                TradeStatus::Simulated,
+                None,
+                None,
+                &target_wallet,
+                start,
+            );
             let _ = self.record_tx.send(record).await;
 
-            let _ = self.redis.set_cooldown(&intent.output_mint.to_string()).await;
+            let _ = self
+                .redis
+                .set_cooldown(&intent.output_mint.to_string())
+                .await;
             let _ = self.redis.increment_trade_count().await;
             return;
         }
@@ -196,7 +213,11 @@ impl ExecutionEngine {
             }
         };
 
-        let swap_resp = match self.jupiter.get_swap_transaction(&quote, &wallet_pubkey).await {
+        let swap_resp = match self
+            .jupiter
+            .get_swap_transaction(&quote, &wallet_pubkey)
+            .await
+        {
             Ok(s) => s,
             Err(e) => {
                 tracing::error!(error = %e, "Jupiter swap tx build failed");
@@ -213,7 +234,11 @@ impl ExecutionEngine {
             }
         };
 
-        let sim_result = match self.rpc.simulate_transaction(&swap_resp.swap_transaction).await {
+        let sim_result = match self
+            .rpc
+            .simulate_transaction(&swap_resp.swap_transaction)
+            .await
+        {
             Ok(r) => r,
             Err(e) => {
                 tracing::error!(error = %e, "Simulation RPC call failed");
@@ -258,16 +283,17 @@ impl ExecutionEngine {
 
         let send_result = if self.jito.is_enabled() {
             match &self.keypair {
-                Some(kp) => {
-                    match self.rpc.get_latest_blockhash().await {
-                        Ok(blockhash) => {
-                            self.jito
-                                .send_bundle(&swap_resp.swap_transaction, kp, blockhash)
-                                .await
-                        }
-                        Err(e) => Err(anyhow::anyhow!("Failed to get blockhash for Jito tip: {}", e)),
+                Some(kp) => match self.rpc.get_latest_blockhash().await {
+                    Ok(blockhash) => {
+                        self.jito
+                            .send_bundle(&swap_resp.swap_transaction, kp, blockhash)
+                            .await
                     }
-                }
+                    Err(e) => Err(anyhow::anyhow!(
+                        "Failed to get blockhash for Jito tip: {}",
+                        e
+                    )),
+                },
                 None => Err(anyhow::anyhow!("No keypair available for Jito tip")),
             }
         } else {
@@ -335,7 +361,10 @@ impl ExecutionEngine {
                     self.metrics.open_positions.inc();
                     self.metrics.portfolio_exposure.add(trade_sol);
                 } else {
-                    let _ = self.redis.remove_position(&intent.input_mint.to_string()).await;
+                    let _ = self
+                        .redis
+                        .remove_position(&intent.input_mint.to_string())
+                        .await;
                     self.metrics.open_positions.dec();
                     self.metrics.portfolio_exposure.sub(trade_sol);
                 }
@@ -376,7 +405,10 @@ impl ExecutionEngine {
             }
         }
 
-        let _ = self.redis.set_cooldown(&intent.output_mint.to_string()).await;
+        let _ = self
+            .redis
+            .set_cooldown(&intent.output_mint.to_string())
+            .await;
         let _ = self.redis.increment_trade_count().await;
     }
 

@@ -1,13 +1,11 @@
 [workspace]
-members = ["jetstream_protos", "yellowstone_protos", "copy-trader"]
+members = ["copy-trader"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [workspace.dependencies]
-prost = "0.14.3"
-tonic = "0.14.5"
 tokio = { version = "1.50", features = ["full"] }
 tracing = "0.1.44"

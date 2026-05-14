@@ -89,10 +89,7 @@ impl TelegramNotifier {
             },
         );
 
-        let url = format!(
-            "https://api.telegram.org/bot{}/sendMessage",
-            self.bot_token
-        );
+        let url = format!("https://api.telegram.org/bot{}/sendMessage", self.bot_token);
 
         self.http
             .post(&url)
@@ -113,10 +110,7 @@ impl TelegramNotifier {
             return Ok(());
         }
 
-        let url = format!(
-            "https://api.telegram.org/bot{}/sendMessage",
-            self.bot_token
-        );
+        let url = format!("https://api.telegram.org/bot{}/sendMessage", self.bot_token);
 
         self.http
             .post(&url)

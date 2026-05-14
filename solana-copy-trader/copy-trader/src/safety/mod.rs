@@ -1,5 +1,5 @@
-pub mod token_filter;
 pub mod rate_limiter;
+pub mod token_filter;
 
 use crate::config::AppConfig;
 use crate::state::redis::RedisClient;

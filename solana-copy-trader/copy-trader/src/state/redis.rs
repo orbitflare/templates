@@ -25,11 +25,10 @@ impl RedisClient {
     pub async fn check_dedup(&self, tx_sig: &str) -> anyhow::Result<bool> {
         let key = self.key(&format!("dedup:{}", tx_sig));
         let mut conn = self.pool.clone();
-        let existed: bool = conn
-            .set_nx(&key, 1i32)
-            .await?;
+        let existed: bool = conn.set_nx(&key, 1i32).await?;
         if existed {
-            conn.expire::<_, ()>(&key, self.config.redis.dedup_ttl_secs as i64).await?;
+            conn.expire::<_, ()>(&key, self.config.redis.dedup_ttl_secs as i64)
+                .await?;
             Ok(false)
         } else {
             Ok(true)
@@ -46,7 +45,8 @@ impl RedisClient {
     pub async fn set_cached_quote(&self, mint: &str, quote_json: &str) -> anyhow::Result<()> {
         let key = self.key(&format!("price:{}", mint));
         let mut conn = self.pool.clone();
-        conn.set_ex::<_, _, ()>(&key, quote_json, self.config.redis.price_cache_ttl_secs).await?;
+        conn.set_ex::<_, _, ()>(&key, quote_json, self.config.redis.price_cache_ttl_secs)
+            .await?;
         Ok(())
     }
 
@@ -75,7 +75,8 @@ impl RedisClient {
     pub async fn get_all_positions(&self) -> anyhow::Result<Vec<Position>> {
         let key = self.key("positions");
         let mut conn = self.pool.clone();
-        let map: std::collections::HashMap<String, String> = conn.hgetall(&key).await.unwrap_or_default();
+        let map: std::collections::HashMap<String, String> =
+            conn.hgetall(&key).await.unwrap_or_default();
         let mut positions = Vec::new();
         for (_mint, data) in map {
             if let Ok(pos) = serde_json::from_str::<Position>(&data) {
@@ -104,7 +105,11 @@ impl RedisClient {
 
     pub async fn get_hourly_trade_count(&self) -> anyhow::Result<u32> {
         let now = Utc::now();
-        let key = self.key(&format!("rate:{}:{}", now.format("%Y-%m-%d"), now.format("%H")));
+        let key = self.key(&format!(
+            "rate:{}:{}",
+            now.format("%Y-%m-%d"),
+            now.format("%H")
+        ));
         let mut conn = self.pool.clone();
         let count: u32 = conn.get(&key).await.unwrap_or(0);
         Ok(count)
@@ -121,7 +126,8 @@ impl RedisClient {
     pub async fn set_cooldown(&self, mint: &str) -> anyhow::Result<()> {
         let key = self.key(&format!("cooldown:{}", mint));
         let mut conn = self.pool.clone();
-        conn.set_ex::<_, _, ()>(&key, 1i32, self.config.safety.cooldown_per_token_secs).await?;
+        conn.set_ex::<_, _, ()>(&key, 1i32, self.config.safety.cooldown_per_token_secs)
+            .await?;
         Ok(())
     }
 

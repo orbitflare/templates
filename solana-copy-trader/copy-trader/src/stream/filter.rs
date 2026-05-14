@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 pub fn build_jetstream_filters(
     config: &AppConfig,
-) -> HashMap<String, jetstream_protos::jetstream::SubscribeRequestFilterTransactions> {
+) -> HashMap<String, orbitflare_sdk::proto::jetstream::SubscribeRequestFilterTransactions> {
     let mut filters = HashMap::new();
 
     let enabled_targets: Vec<&str> = config
@@ -23,7 +23,7 @@ pub fn build_jetstream_filters(
         enabled_targets.len()
     );
 
-    let filter = jetstream_protos::jetstream::SubscribeRequestFilterTransactions {
+    let filter = orbitflare_sdk::proto::jetstream::SubscribeRequestFilterTransactions {
         account_include: enabled_targets.iter().map(|a| a.to_string()).collect(),
         account_exclude: vec![],
         account_required: vec![],
@@ -35,7 +35,7 @@ pub fn build_jetstream_filters(
 
 pub fn build_yellowstone_filters(
     config: &AppConfig,
-) -> HashMap<String, yellowstone_protos::geyser::SubscribeRequestFilterTransactions> {
+) -> HashMap<String, orbitflare_sdk::proto::geyser::SubscribeRequestFilterTransactions> {
     let mut filters = HashMap::new();
 
     let enabled_targets: Vec<&str> = config
@@ -55,7 +55,7 @@ pub fn build_yellowstone_filters(
         enabled_targets.len()
     );
 
-    let filter = yellowstone_protos::geyser::SubscribeRequestFilterTransactions {
+    let filter = orbitflare_sdk::proto::geyser::SubscribeRequestFilterTransactions {
         vote: Some(false),
         failed: Some(false),
         signature: None,

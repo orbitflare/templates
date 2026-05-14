@@ -24,8 +24,10 @@ impl PositionSizer {
         let (mode, fixed_sol, proportion) = if let Some(ovr) = override_config {
             (
                 &ovr.mode,
-                ovr.fixed_amount_sol.unwrap_or(self.config.execution.sizing.fixed_amount_sol),
-                ovr.proportion.unwrap_or(self.config.execution.sizing.proportion),
+                ovr.fixed_amount_sol
+                    .unwrap_or(self.config.execution.sizing.fixed_amount_sol),
+                ovr.proportion
+                    .unwrap_or(self.config.execution.sizing.proportion),
             )
         } else {
             (
@@ -41,9 +43,7 @@ impl PositionSizer {
                 let target_sol = intent.input_amount as f64 / 1e9;
                 target_sol * proportion
             }
-            SizingMode::Mirror => {
-                intent.input_amount as f64 / 1e9
-            }
+            SizingMode::Mirror => intent.input_amount as f64 / 1e9,
         };
 
         let max = self.config.execution.sizing.max_trade_sol;

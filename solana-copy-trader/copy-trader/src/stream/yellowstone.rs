@@ -1,25 +1,20 @@
 use crate::config::AppConfig;
 use crate::stream::filter::build_yellowstone_filters;
 use crate::types::{DetectionSource, InnerInstructionSet, RawInstruction, RawTransaction};
+use orbitflare_sdk::proto::geyser::{
+    subscribe_update::UpdateOneof, CommitmentLevel, SubscribeRequest, SubscribeRequestPing,
+    SubscribeUpdateTransactionInfo,
+};
+use orbitflare_sdk::GeyserClientBuilder;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::{mpsc, watch};
-use tokio_stream::StreamExt;
-use tonic::transport::Channel;
-use yellowstone_protos::geyser::{
-    geyser_client::GeyserClient,
-    subscribe_update::UpdateOneof,
-    CommitmentLevel, SubscribeRequest, SubscribeRequestPing,
-    SubscribeUpdateTransactionInfo,
-};
 
 pub struct YellowstoneManager {
     config: Arc<AppConfig>,
     tx: mpsc::Sender<RawTransaction>,
     shutdown_rx: watch::Receiver<bool>,
-    reconnect_counter: prometheus::IntCounter,
 }
 
 impl YellowstoneManager {
@@ -27,62 +22,23 @@ impl YellowstoneManager {
         config: Arc<AppConfig>,
         tx: mpsc::Sender<RawTransaction>,
         shutdown_rx: watch::Receiver<bool>,
-        reconnect_counter: prometheus::IntCounter,
     ) -> Self {
         Self {
             config,
             tx,
             shutdown_rx,
-            reconnect_counter,
         }
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         let ys_config = &self.config.yellowstone;
-        let mut delay_ms = ys_config.reconnect.initial_delay_ms;
-
-        loop {
-            if *self.shutdown_rx.borrow() {
-                tracing::info!("Yellowstone manager shutting down");
-                return Ok(());
-            }
-
-            match self.connect_and_stream().await {
-                Ok(()) => {
-                    tracing::info!("Yellowstone stream ended normally");
-                    return Ok(());
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, delay_ms, "Yellowstone disconnected, reconnecting...");
-                    self.reconnect_counter.inc();
-
-                    tokio::select! {
-                        _ = tokio::time::sleep(Duration::from_millis(delay_ms)) => {}
-                        _ = self.shutdown_rx.changed() => {
-                            tracing::info!("Yellowstone shutting down during reconnect backoff");
-                            return Ok(());
-                        }
-                    }
-
-                    let ys_config = &self.config.yellowstone;
-                    delay_ms = (delay_ms as f64 * ys_config.reconnect.multiplier) as u64;
-                    delay_ms = delay_ms.min(ys_config.reconnect.max_delay_ms);
-                }
-            }
-        }
-    }
-
-    async fn connect_and_stream(&mut self) -> anyhow::Result<()> {
-        let ys_config = &self.config.yellowstone;
         tracing::info!(url = %ys_config.url, "Connecting to Yellowstone gRPC");
 
-        let channel = Channel::from_shared(ys_config.url.clone())?
-            .timeout(Duration::from_secs(ys_config.timeout_secs))
-            .tcp_keepalive(Some(Duration::from_secs(ys_config.tcp_keepalive_secs)))
-            .connect()
-            .await?;
-
-        let mut client = GeyserClient::new(channel);
+        let client = GeyserClientBuilder::new()
+            .url(&ys_config.url)
+            .timeout_secs(ys_config.timeout_secs)
+            .keepalive_secs(ys_config.tcp_keepalive_secs)
+            .build()?;
 
         let tx_filters = build_yellowstone_filters(&self.config);
 
@@ -111,42 +67,34 @@ impl YellowstoneManager {
             from_slot: None,
         };
 
-        let outbound = tokio_stream::iter(vec![request]);
-        let response = client.subscribe(outbound).await?;
-        let mut inbound = response.into_inner();
-
+        let mut stream = client.subscribe(request);
         tracing::info!("Connected to Yellowstone, streaming transactions with inner instructions");
 
         loop {
             tokio::select! {
-                msg = inbound.next() => {
-                    match msg {
-                        Some(Ok(update)) => {
-                            match update.update_oneof {
-                                Some(UpdateOneof::Transaction(tx_update)) => {
-                                    let slot = tx_update.slot;
-                                    if let Some(tx_info) = tx_update.transaction {
-                                        let mut raw = convert_yellowstone_tx(tx_info);
-                                        raw.slot = slot;
-                                        if self.tx.try_send(raw).is_err() {
-                                            tracing::warn!("Transaction channel full, dropping Yellowstone tx");
-                                        }
+                update = stream.next() => {
+                    match update {
+                        Some(Ok(update)) => match update.update_oneof {
+                            Some(UpdateOneof::Transaction(tx_update)) => {
+                                let slot = tx_update.slot;
+                                if let Some(tx_info) = tx_update.transaction {
+                                    let mut raw = convert_yellowstone_tx(tx_info);
+                                    raw.slot = slot;
+                                    if self.tx.try_send(raw).is_err() {
+                                        tracing::warn!("Transaction channel full, dropping Yellowstone tx");
                                     }
                                 }
-                                Some(UpdateOneof::Ping(_)) => {
-                                    tracing::trace!("Received ping from Yellowstone");
-                                }
-                                Some(UpdateOneof::Pong(_)) => {
-                                    tracing::trace!("Received pong from Yellowstone");
-                                }
-                                _ => {}
                             }
-                        }
+                            Some(UpdateOneof::Ping(_)) => tracing::trace!("Received ping from Yellowstone"),
+                            Some(UpdateOneof::Pong(_)) => tracing::trace!("Received pong from Yellowstone"),
+                            _ => {}
+                        },
                         Some(Err(e)) => {
-                            return Err(anyhow::anyhow!("Yellowstone stream error: {}", e));
+                            return Err(anyhow::anyhow!("Yellowstone stream gave up after SDK retries: {}", e));
                         }
                         None => {
-                            return Err(anyhow::anyhow!("Yellowstone stream ended unexpectedly"));
+                            tracing::info!("Yellowstone stream closed");
+                            return Ok(());
                         }
                     }
                 }

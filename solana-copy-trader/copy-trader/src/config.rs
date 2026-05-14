@@ -502,7 +502,9 @@ pub struct JournalConfig {
     pub database_url: String,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 pub fn load_config(path: &std::path::Path) -> anyhow::Result<AppConfig> {
     let raw = std::fs::read_to_string(path)
@@ -586,7 +588,10 @@ pub fn validate_config(config: &AppConfig) -> anyhow::Result<()> {
     tracing::info!("  Dry run: {}", config.execution.dry_run);
     tracing::info!("  Sizing mode: {:?}", config.execution.sizing.mode);
     tracing::info!("  Journal enabled: {}", config.journal.enabled);
-    tracing::info!("  Telegram enabled: {}", config.notifications.telegram.enabled);
+    tracing::info!(
+        "  Telegram enabled: {}",
+        config.notifications.telegram.enabled
+    );
 
     Ok(())
 }

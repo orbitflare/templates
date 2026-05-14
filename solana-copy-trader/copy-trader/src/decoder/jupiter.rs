@@ -81,7 +81,9 @@ impl DexDecoder for JupiterDecoder {
         }
 
         let _route_plan_len = u32::from_le_bytes(
-            data[route_plan_offset..route_plan_offset + 4].try_into().ok()?,
+            data[route_plan_offset..route_plan_offset + 4]
+                .try_into()
+                .ok()?,
         ) as usize;
 
         // Tail: in_amount(8) + quoted_out(8) + slippage(2) + platform_fee(1) = 19 bytes

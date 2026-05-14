@@ -1,3 +1,3 @@
-pub mod metrics;
 pub mod journal;
+pub mod metrics;
 pub mod telegram;
