@@ -20,7 +20,9 @@ impl TransactionFilter for ProgramFilter {
         if self.programs.is_empty() {
             return true;
         }
-        tx.account_keys.iter().any(|key| self.programs.contains(key))
+        tx.account_keys
+            .iter()
+            .any(|key| self.programs.contains(key))
     }
 
     fn name(&self) -> &str {

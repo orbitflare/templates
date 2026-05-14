@@ -1,6 +1,6 @@
-mod shutdown;
 mod metrics;
 mod pipeline;
+mod shutdown;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -26,8 +26,7 @@ async fn main() -> anyhow::Result<()> {
         .nth(1)
         .unwrap_or_else(|| "config.yml".to_string());
 
-    let config = load_config(&PathBuf::from(&config_path))
-        .context("failed to load config")?;
+    let config = load_config(&PathBuf::from(&config_path)).context("failed to load config")?;
     let config = Arc::new(config);
 
     init_tracing(&config.logging);
@@ -68,8 +67,9 @@ async fn main() -> anyhow::Result<()> {
         if let Some(slot) = last_slot {
             info!(slot, "resuming yellowstone from last indexed slot");
         }
-        let stream = YellowstoneStream::new(config.yellowstone_url.clone(), config.yellowstone.clone())
-            .resume_from(last_slot);
+        let stream =
+            YellowstoneStream::new(config.yellowstone_url.clone(), config.yellowstone.clone())
+                .resume_from(last_slot);
         let handle = Pipeline::spawn_stream(
             stream,
             filter_clone(&config.filters),
@@ -120,8 +120,8 @@ fn init_tracing(config: &indexer_config::model::LoggingConfig) {
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::prelude::*;
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.level));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.level));
 
     if config.json {
         tracing_subscriber::registry()

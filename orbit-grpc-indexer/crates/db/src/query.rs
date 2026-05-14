@@ -1,5 +1,5 @@
-use sea_orm::*;
 use sea_orm::sea_query::Expr;
+use sea_orm::*;
 
 use crate::entity::{account_touched, inner_instruction, transaction};
 use indexer_core::error::{IndexerError, Result};
@@ -89,8 +89,7 @@ pub async fn get_transactions_offset(
     db: &DatabaseConnection,
     q: &TransactionQuery<'_>,
 ) -> Result<(Vec<transaction::Model>, u64)> {
-    let mut query = transaction::Entity::find()
-        .order_by_desc(transaction::Column::Slot);
+    let mut query = transaction::Entity::find().order_by_desc(transaction::Column::Slot);
 
     query = apply_filters(query, q);
 
@@ -234,7 +233,9 @@ pub async fn get_transactions_by_account_cursor(
     };
 
     let next_cursor = if has_more {
-        at_rows.get(limit as usize - 1).map(|r| format!("{}_{}", r.slot, r.signature))
+        at_rows
+            .get(limit as usize - 1)
+            .map(|r| format!("{}_{}", r.slot, r.signature))
     } else {
         None
     };

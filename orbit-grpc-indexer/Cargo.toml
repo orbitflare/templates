@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/proto",
     "crates/core",
     "crates/config",
     "crates/ingest",
@@ -12,18 +11,15 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 
 [workspace.dependencies]
+orbitflare-sdk = { version = "0.2.2", features = ["grpc", "jetstream"] }
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-stream = "0.1.18"
-tonic = "0.14.5"
-prost = "0.14.3"
-prost-types = "0.14.3"
-tonic-prost = "0.14.5"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_yml = "0.0.12"
@@ -41,7 +37,6 @@ anyhow = "1.0.100"
 async-trait = "0.1.88"
 chrono = { version = "0.4.44", features = ["serde"] }
 bs58 = "0.5.1"
-indexer-proto = { path = "crates/proto" }
 indexer-core = { path = "crates/core" }
 indexer-config = { path = "crates/config" }
 indexer-ingest = { path = "crates/ingest" }

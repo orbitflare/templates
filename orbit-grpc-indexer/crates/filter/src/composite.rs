@@ -18,15 +18,15 @@ impl CompositeFilter {
         let mut filters: Vec<Box<dyn TransactionFilter>> = Vec::new();
 
         if !config.program_ids.is_empty() {
-            filters.push(Box::new(
-                crate::program::ProgramFilter::new(config.program_ids.clone()),
-            ));
+            filters.push(Box::new(crate::program::ProgramFilter::new(
+                config.program_ids.clone(),
+            )));
         }
 
         if !config.accounts.is_empty() {
-            filters.push(Box::new(
-                crate::account::AccountFilter::new(config.accounts.clone()),
-            ));
+            filters.push(Box::new(crate::account::AccountFilter::new(
+                config.accounts.clone(),
+            )));
         }
 
         if config.require_success {

@@ -34,19 +34,14 @@ pub async fn list_transactions(
 
     match params.pagination.as_str() {
         "offset" => {
-            let (items, total) = indexer_db::query::get_transactions_offset(
-                &state.db, &q,
-            )
-            .await?;
+            let (items, total) = indexer_db::query::get_transactions_offset(&state.db, &q).await?;
 
             let pagination = offset::build_offset_pagination(total, q.offset.unwrap_or(0), limit);
             Ok(ApiResponse::paginated(items, pagination))
         }
         _ => {
-            let (items, next_cursor) = indexer_db::query::get_transactions_cursor(
-                &state.db, &q,
-            )
-            .await?;
+            let (items, next_cursor) =
+                indexer_db::query::get_transactions_cursor(&state.db, &q).await?;
 
             let pagination = cursor::build_cursor_pagination(next_cursor, limit);
             Ok(ApiResponse::paginated(items, pagination))

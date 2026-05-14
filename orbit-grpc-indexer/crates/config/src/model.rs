@@ -161,19 +161,51 @@ pub struct LoggingConfig {
     pub json: bool,
 }
 
-fn default_timeout_secs() -> u64 { 30 }
-fn default_keepalive_secs() -> u64 { 60 }
-fn default_true() -> bool { true }
-fn default_commitment() -> String { "confirmed".to_string() }
-fn default_reconnect_base_ms() -> u64 { 1000 }
-fn default_reconnect_max_ms() -> u64 { 30_000 }
-fn default_reconnect_multiplier() -> f64 { 2.0 }
-fn default_max_connections() -> u32 { 10 }
-fn default_min_connections() -> u32 { 2 }
-fn default_default_page_limit() -> u64 { 50 }
-fn default_max_page_limit() -> u64 { 500 }
-fn default_batch_size() -> usize { 100 }
-fn default_batch_flush_ms() -> u64 { 500 }
-fn default_batch_retry_count() -> u32 { 3 }
-fn default_batch_retry_delay_ms() -> u64 { 1000 }
-fn default_log_level() -> String { "info".to_string() }
+fn default_timeout_secs() -> u64 {
+    30
+}
+fn default_keepalive_secs() -> u64 {
+    60
+}
+fn default_true() -> bool {
+    true
+}
+fn default_commitment() -> String {
+    "confirmed".to_string()
+}
+fn default_reconnect_base_ms() -> u64 {
+    1000
+}
+fn default_reconnect_max_ms() -> u64 {
+    30_000
+}
+fn default_reconnect_multiplier() -> f64 {
+    2.0
+}
+fn default_max_connections() -> u32 {
+    10
+}
+fn default_min_connections() -> u32 {
+    2
+}
+fn default_default_page_limit() -> u64 {
+    50
+}
+fn default_max_page_limit() -> u64 {
+    500
+}
+fn default_batch_size() -> usize {
+    100
+}
+fn default_batch_flush_ms() -> u64 {
+    500
+}
+fn default_batch_retry_count() -> u32 {
+    3
+}
+fn default_batch_retry_delay_ms() -> u64 {
+    1000
+}
+fn default_log_level() -> String {
+    "info".to_string()
+}

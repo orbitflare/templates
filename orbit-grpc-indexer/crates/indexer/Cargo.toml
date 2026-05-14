@@ -10,7 +10,6 @@ name = "orbit-grpc-indexer"
 path = "src/main.rs"
 
 [dependencies]
-indexer-proto.workspace = true
 indexer-core.workspace = true
 indexer-config.workspace = true
 indexer-ingest.workspace = true

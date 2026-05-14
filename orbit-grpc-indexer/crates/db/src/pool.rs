@@ -29,11 +29,7 @@ pub async fn run_migrations(db: &DatabaseConnection, migrations_dir: &Path) -> R
     let mut entries: Vec<_> = std::fs::read_dir(migrations_dir)
         .map_err(|e| IndexerError::Database(format!("failed to read migrations dir: {e}")))?
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .is_some_and(|ext| ext == "sql")
-        })
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "sql"))
         .collect();
 
     entries.sort_by_key(|e| e.file_name());
@@ -53,7 +49,10 @@ pub async fn run_migrations(db: &DatabaseConnection, migrations_dir: &Path) -> R
                 continue;
             }
             let _: sea_orm::ExecResult = db
-                .execute(sea_orm::Statement::from_string(backend, trimmed.to_string()))
+                .execute(sea_orm::Statement::from_string(
+                    backend,
+                    trimmed.to_string(),
+                ))
                 .await
                 .map_err(|e| IndexerError::Database(format!("migration {name} failed: {e}")))?;
         }

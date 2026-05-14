@@ -134,7 +134,9 @@ impl PostgresSink {
                     ],
                 ))
                 .await
-                .map_err(|e| IndexerError::Database(format!("inner instruction insert failed: {e}")))?;
+                .map_err(|e| {
+                    IndexerError::Database(format!("inner instruction insert failed: {e}"))
+                })?;
         }
 
         Ok(())
@@ -168,7 +170,9 @@ impl PostgresSink {
                     ],
                 ))
                 .await
-                .map_err(|e| IndexerError::Database(format!("accounts_touched insert failed: {e}")))?;
+                .map_err(|e| {
+                    IndexerError::Database(format!("accounts_touched insert failed: {e}"))
+                })?;
         }
 
         Ok(())

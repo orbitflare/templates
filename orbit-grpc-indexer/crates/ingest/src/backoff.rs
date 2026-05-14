@@ -26,8 +26,8 @@ impl Backoff {
             return None;
         }
 
-        let delay_ms = self.base_delay.as_millis() as f64
-            * self.multiplier.powi(self.attempt as i32);
+        let delay_ms =
+            self.base_delay.as_millis() as f64 * self.multiplier.powi(self.attempt as i32);
         let delay = Duration::from_millis(delay_ms as u64).min(self.max_delay);
 
         self.attempt += 1;

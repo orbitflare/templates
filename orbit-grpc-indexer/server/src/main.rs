@@ -1,11 +1,11 @@
-mod router;
-mod state;
 mod error;
 mod filter;
-mod response;
 mod handler;
-mod pagination;
 mod health;
+mod pagination;
+mod response;
+mod router;
+mod state;
 
 use std::sync::Arc;
 
@@ -23,8 +23,8 @@ async fn main() -> anyhow::Result<()> {
         .nth(1)
         .unwrap_or_else(|| "config.yml".to_string());
 
-    let config = load_config(&std::path::PathBuf::from(&config_path))
-        .context("failed to load config")?;
+    let config =
+        load_config(&std::path::PathBuf::from(&config_path)).context("failed to load config")?;
     let config = Arc::new(config);
 
     init_tracing(&config.logging);
@@ -101,8 +101,8 @@ fn init_tracing(config: &indexer_config::model::LoggingConfig) {
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::prelude::*;
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.level));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.level));
 
     if config.json {
         tracing_subscriber::registry()

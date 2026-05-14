@@ -6,13 +6,11 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-indexer-proto.workspace = true
+orbitflare-sdk.workspace = true
 indexer-core.workspace = true
 indexer-config.workspace = true
 async-trait.workspace = true
 tokio.workspace = true
-tokio-stream.workspace = true
-tonic.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 bs58.workspace = true

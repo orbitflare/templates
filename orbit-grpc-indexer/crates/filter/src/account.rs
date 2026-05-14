@@ -20,7 +20,9 @@ impl TransactionFilter for AccountFilter {
         if self.accounts.is_empty() {
             return true;
         }
-        tx.account_keys.iter().any(|key| self.accounts.contains(key))
+        tx.account_keys
+            .iter()
+            .any(|key| self.accounts.contains(key))
     }
 
     fn name(&self) -> &str {

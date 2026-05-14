@@ -1,30 +1,24 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use async_trait::async_trait;
-use tokio_stream::StreamExt;
-use tonic::transport::Channel;
+use orbitflare_sdk::proto::jetstream::{
+    SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterTransactions,
+    SubscribeRequestPing, SubscribeUpdateTransactionInfo, subscribe_update::UpdateOneof,
+};
+use orbitflare_sdk::{JetstreamClientBuilder, JetstreamStream as SdkJetstreamStream};
 use tracing::{debug, error, info, warn};
 
 use indexer_config::model::JetstreamConfig;
 use indexer_core::error::{IndexerError, Result};
 use indexer_core::stream::TransactionStream;
 use indexer_core::types::{RawTransaction, StreamSource};
-use indexer_proto::jetstream::{
-    jetstream_client::JetstreamClient,
-    subscribe_update::UpdateOneof,
-    SubscribeRequest, SubscribeRequestFilterAccounts,
-    SubscribeRequestFilterTransactions, SubscribeRequestPing,
-};
 
 use crate::backoff::Backoff;
-
-type GrpcStream = tonic::Streaming<indexer_proto::jetstream::SubscribeUpdate>;
 
 pub struct JetstreamStream {
     url: String,
     config: JetstreamConfig,
-    stream: Option<GrpcStream>,
+    stream: Option<SdkJetstreamStream>,
     backoff: Backoff,
 }
 
@@ -39,17 +33,6 @@ impl JetstreamStream {
         }
     }
 
-    async fn create_channel(&self, url: &str) -> Result<Channel> {
-        Channel::from_shared(url.to_string())
-            .map_err(|e| IndexerError::Connection(format!("invalid endpoint: {e}")))?
-            .timeout(Duration::from_secs(self.config.timeout_secs))
-            .tcp_keepalive(Some(Duration::from_secs(self.config.tcp_keepalive_secs)))
-            .connect_timeout(Duration::from_secs(self.config.timeout_secs))
-            .connect()
-            .await
-            .map_err(|e| IndexerError::Connection(format!("jetstream connect failed: {e}")))
-    }
-
     fn build_subscribe_request(&self) -> SubscribeRequest {
         let mut transactions = HashMap::new();
         transactions.insert(
@@ -62,9 +45,7 @@ impl JetstreamStream {
         );
 
         let mut accounts = HashMap::new();
-        if !self.config.accounts.account.is_empty()
-            || !self.config.accounts.owner.is_empty()
-        {
+        if !self.config.accounts.account.is_empty() || !self.config.accounts.owner.is_empty() {
             accounts.insert(
                 "default".to_string(),
                 SubscribeRequestFilterAccounts {
@@ -82,25 +63,18 @@ impl JetstreamStream {
         }
     }
 
-    async fn establish_stream(&self) -> Result<GrpcStream> {
-        let channel = self.create_channel(&self.url).await?;
-        let mut client = JetstreamClient::new(channel);
+    fn establish_stream(&self) -> Result<SdkJetstreamStream> {
+        let client = JetstreamClientBuilder::new()
+            .url(&self.url)
+            .timeout_secs(self.config.timeout_secs)
+            .keepalive_secs(self.config.tcp_keepalive_secs)
+            .build()
+            .map_err(|e| IndexerError::Connection(format!("jetstream build failed: {e}")))?;
 
-        let request = self.build_subscribe_request();
-        let outbound = tokio_stream::iter(vec![request]);
-
-        let response = client
-            .subscribe(outbound)
-            .await
-            .map_err(|e| IndexerError::Stream(format!("jetstream subscribe failed: {e}")))?;
-
-        Ok(response.into_inner())
+        Ok(client.subscribe(self.build_subscribe_request()))
     }
 
-    fn parse_transaction(
-        tx_info: indexer_proto::jetstream::SubscribeUpdateTransactionInfo,
-        slot: u64,
-    ) -> RawTransaction {
+    fn parse_transaction(tx_info: SubscribeUpdateTransactionInfo, slot: u64) -> RawTransaction {
         let signature = bs58::encode(&tx_info.signature).into_string();
 
         let account_keys: Vec<String> = tx_info
@@ -131,8 +105,7 @@ impl JetstreamStream {
 impl TransactionStream for JetstreamStream {
     async fn connect(&mut self) -> Result<()> {
         info!(url = %self.url, "connecting to jetstream");
-        let stream = self.establish_stream().await?;
-        self.stream = Some(stream);
+        self.stream = Some(self.establish_stream()?);
         self.backoff.reset();
         info!("jetstream stream connected");
         Ok(())
@@ -172,9 +145,10 @@ impl TransactionStream for JetstreamStream {
     async fn reconnect(&mut self) -> Result<()> {
         self.stream = None;
 
-        let delay = self.backoff.next_delay().ok_or_else(|| {
-            IndexerError::Connection("jetstream max retries exhausted".into())
-        })?;
+        let delay = self
+            .backoff
+            .next_delay()
+            .ok_or_else(|| IndexerError::Connection("jetstream max retries exhausted".into()))?;
 
         warn!(
             attempt = self.backoff.attempt(),

@@ -1,30 +1,25 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use async_trait::async_trait;
-use tokio_stream::StreamExt;
-use tonic::transport::Channel;
+use orbitflare_sdk::proto::geyser::{
+    CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots,
+    SubscribeRequestFilterTransactions, SubscribeRequestPing, SubscribeUpdateTransactionInfo,
+    subscribe_update::UpdateOneof,
+};
+use orbitflare_sdk::{GeyserClientBuilder, GeyserStream};
 use tracing::{debug, error, info, warn};
 
 use indexer_config::model::YellowstoneConfig;
 use indexer_core::error::{IndexerError, Result};
 use indexer_core::stream::TransactionStream;
 use indexer_core::types::{InnerInstruction, RawTransaction, StreamSource};
-use indexer_proto::geyser::{
-    geyser_client::GeyserClient,
-    subscribe_update::UpdateOneof,
-    CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots,
-    SubscribeRequestFilterTransactions, SubscribeRequestPing,
-};
 
 use crate::backoff::Backoff;
-
-type GrpcStream = tonic::Streaming<indexer_proto::geyser::SubscribeUpdate>;
 
 pub struct YellowstoneStream {
     url: String,
     config: YellowstoneConfig,
-    stream: Option<GrpcStream>,
+    stream: Option<GeyserStream>,
     backoff: Backoff,
     last_slot: Option<u64>,
 }
@@ -52,17 +47,6 @@ impl YellowstoneStream {
             "finalized" => CommitmentLevel::Finalized,
             _ => CommitmentLevel::Confirmed,
         }
-    }
-
-    async fn create_channel(&self, url: &str) -> Result<Channel> {
-        Channel::from_shared(url.to_string())
-            .map_err(|e| IndexerError::Connection(format!("invalid endpoint: {e}")))?
-            .timeout(Duration::from_secs(self.config.timeout_secs))
-            .tcp_keepalive(Some(Duration::from_secs(self.config.tcp_keepalive_secs)))
-            .connect_timeout(Duration::from_secs(self.config.timeout_secs))
-            .connect()
-            .await
-            .map_err(|e| IndexerError::Connection(format!("yellowstone connect failed: {e}")))
     }
 
     fn build_subscribe_request(&self) -> SubscribeRequest {
@@ -106,9 +90,13 @@ impl YellowstoneStream {
         }
     }
 
-    async fn establish_stream(&self) -> Result<GrpcStream> {
-        let channel = self.create_channel(&self.url).await?;
-        let mut client = GeyserClient::new(channel);
+    fn establish_stream(&self) -> Result<GeyserStream> {
+        let client = GeyserClientBuilder::new()
+            .url(&self.url)
+            .timeout_secs(self.config.timeout_secs)
+            .keepalive_secs(self.config.tcp_keepalive_secs)
+            .build()
+            .map_err(|e| IndexerError::Connection(format!("yellowstone build failed: {e}")))?;
 
         let request = self.build_subscribe_request();
         debug!(
@@ -117,18 +105,11 @@ impl YellowstoneStream {
             commitment = ?request.commitment,
             "yellowstone subscribe request"
         );
-        let outbound = tokio_stream::iter(vec![request]);
-
-        let response = client
-            .subscribe(outbound)
-            .await
-            .map_err(|e| IndexerError::Stream(format!("yellowstone subscribe failed: {e}")))?;
-
-        Ok(response.into_inner())
+        Ok(client.subscribe(request))
     }
 
     fn parse_transaction(
-        tx_info: indexer_proto::geyser::SubscribeUpdateTransactionInfo,
+        tx_info: SubscribeUpdateTransactionInfo,
         slot: u64,
     ) -> Option<RawTransaction> {
         let signature = bs58::encode(&tx_info.signature).into_string();
@@ -155,9 +136,7 @@ impl YellowstoneStream {
             .filter(|e| !e.err.is_empty())
             .map(|e| serde_json::json!({ "err": bs58::encode(&e.err).into_string() }));
 
-        let log_messages = meta
-            .map(|m| m.log_messages.clone())
-            .unwrap_or_default();
+        let log_messages = meta.map(|m| m.log_messages.clone()).unwrap_or_default();
 
         let inner_instructions = meta
             .map(|m| {
@@ -214,8 +193,7 @@ impl YellowstoneStream {
 impl TransactionStream for YellowstoneStream {
     async fn connect(&mut self) -> Result<()> {
         info!(url = %self.url, "connecting to yellowstone");
-        let stream = self.establish_stream().await?;
-        self.stream = Some(stream);
+        self.stream = Some(self.establish_stream()?);
         self.backoff.reset();
         info!("yellowstone stream connected");
         Ok(())
@@ -244,7 +222,10 @@ impl TransactionStream for YellowstoneStream {
                     Ok(None)
                 }
                 Some(other) => {
-                    debug!("yellowstone non-tx update: {:?}", std::mem::discriminant(&other));
+                    debug!(
+                        "yellowstone non-tx update: {:?}",
+                        std::mem::discriminant(&other)
+                    );
                     Ok(None)
                 }
                 None => {
@@ -266,9 +247,10 @@ impl TransactionStream for YellowstoneStream {
     async fn reconnect(&mut self) -> Result<()> {
         self.stream = None;
 
-        let delay = self.backoff.next_delay().ok_or_else(|| {
-            IndexerError::Connection("yellowstone max retries exhausted".into())
-        })?;
+        let delay = self
+            .backoff
+            .next_delay()
+            .ok_or_else(|| IndexerError::Connection("yellowstone max retries exhausted".into()))?;
 
         warn!(
             attempt = self.backoff.attempt(),
