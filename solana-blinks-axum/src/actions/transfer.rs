@@ -1,15 +1,18 @@
 use async_trait::async_trait;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use orbitflare_sdk::RpcClient;
 use solana_sdk::message::Message;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::transaction::Transaction;
 use solana_system_interface::instruction as system_instruction;
 use std::collections::HashMap;
 
-use crate::actions::{get_param, lamports_to_sol, serialize_tx, sol_to_lamports, Action};
+use crate::actions::{
+    fetch_blockhash, get_param, lamports_to_sol, serialize_tx, sol_to_lamports, Action,
+};
 use crate::consts::{LAMPORTS_PER_SIGNATURE, SOLANA_LOGO_URL};
 use crate::error::AppError;
 use crate::spec::{ActionGetResponse, ActionParameter, ActionPostResponse, LinkedAction};
+use serde_json::json;
 
 pub struct TransferAction;
 
@@ -55,11 +58,14 @@ impl Action for TransferAction {
 
         let lamports = sol_to_lamports(amount_sol);
 
+        let account_str = account.to_string();
+        let recipient_str = recipient.to_string();
+
         // fire all independent RPC reads concurrently
         let (balance_res, account_res, blockhash_res) = tokio::join!(
-            rpc.get_balance(&account),
-            rpc.get_account(&recipient),
-            rpc.get_latest_blockhash(),
+            rpc.get_balance(&account_str),
+            rpc.get_account_info(&recipient_str),
+            fetch_blockhash(rpc),
         );
 
         let balance = balance_res?;
@@ -71,19 +77,16 @@ impl Action for TransferAction {
             )));
         }
 
-        let recipient_exists = match account_res {
-            Ok(_) => true,
-            Err(err)
-                if err.to_string().contains("AccountNotFound")
-                    || err.to_string().contains("could not find account") =>
-            {
-                false
-            }
-            Err(err) => return Err(err.into()),
-        };
+        let recipient_exists = account_res?.is_some();
 
         if !recipient_exists {
-            let min_rent = rpc.get_minimum_balance_for_rent_exemption(0).await?;
+            let min_rent = rpc
+                .request("getMinimumBalanceForRentExemption", json!([0]))
+                .await?
+                .as_u64()
+                .ok_or_else(|| {
+                    AppError::BadRequest("Invalid rent exemption response from RPC".into())
+                })?;
             if lamports < min_rent {
                 return Err(AppError::BadRequest(format!(
                     "Recipient account doesn't exist. Transfer at least {} SOL to cover rent exemption",

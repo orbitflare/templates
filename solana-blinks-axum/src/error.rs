@@ -13,16 +13,10 @@ pub enum AppError {
     NotFound(String),
 
     #[error("RPC error: {0}")]
-    Rpc(Box<solana_client::client_error::ClientError>),
+    Rpc(#[from] orbitflare_sdk::Error),
 
     #[error("Serialization error: {0}")]
     Serialization(#[from] bincode::Error),
-}
-
-impl From<solana_client::client_error::ClientError> for AppError {
-    fn from(err: solana_client::client_error::ClientError) -> Self {
-        Self::Rpc(Box::new(err))
-    }
 }
 
 impl IntoResponse for AppError {

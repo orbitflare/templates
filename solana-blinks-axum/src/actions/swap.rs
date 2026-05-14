@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use orbitflare_sdk::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashMap;
 
@@ -53,7 +53,7 @@ impl Action for SwapAction {
         let amount: f64 = get_param(&params, "amount")?;
 
         if from_token == "SOL" {
-            let balance = rpc.get_balance(&account).await?;
+            let balance = rpc.get_balance(&account.to_string()).await?;
             let lamports_needed = sol_to_lamports(amount);
             if balance < lamports_needed + 2 * LAMPORTS_PER_SIGNATURE {
                 return Err(AppError::BadRequest(format!(

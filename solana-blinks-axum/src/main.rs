@@ -6,7 +6,7 @@ mod router;
 mod spec;
 mod state;
 
-use solana_client::nonblocking::rpc_client::RpcClient;
+use orbitflare_sdk::RpcClientBuilder;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::signal;
@@ -28,7 +28,12 @@ async fn main() {
     tracing::info!("RPC endpoint: {rpc_url}");
     tracing::info!("Listening on {bind_addr}");
 
-    let rpc = Arc::new(RpcClient::new(rpc_url));
+    let rpc = Arc::new(
+        RpcClientBuilder::new()
+            .url(&rpc_url)
+            .build()
+            .expect("Failed to build RPC client"),
+    );
     let app = router::build_router(rpc);
 
     let listener = TcpListener::bind(&bind_addr)

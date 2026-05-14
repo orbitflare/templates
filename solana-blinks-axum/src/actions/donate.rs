@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use orbitflare_sdk::RpcClient;
 use solana_sdk::message::Message;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::transaction::Transaction;
@@ -7,7 +7,8 @@ use solana_system_interface::instruction::transfer;
 use std::collections::HashMap;
 
 use crate::actions::{
-    build_memo_tx, get_param, lamports_to_sol, serialize_tx, sol_to_lamports, Action,
+    build_memo_tx, fetch_blockhash, get_param, lamports_to_sol, serialize_tx, sol_to_lamports,
+    Action,
 };
 use crate::consts::{DONATE_TREASURY, LAMPORTS_PER_SIGNATURE, SOLANA_LOGO_URL};
 use crate::error::AppError;
@@ -65,8 +66,9 @@ impl Action for DonateAction {
         let amount: f64 = get_param(&params, "amount")?;
         let lamports = sol_to_lamports(amount);
 
+        let account_str = account.to_string();
         let (balance_res, blockhash_res) =
-            tokio::join!(rpc.get_balance(&account), rpc.get_latest_blockhash(),);
+            tokio::join!(rpc.get_balance(&account_str), fetch_blockhash(rpc));
 
         let balance = balance_res?;
         if balance < lamports + 2 * LAMPORTS_PER_SIGNATURE {

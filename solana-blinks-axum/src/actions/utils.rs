@@ -1,5 +1,6 @@
 use base64::Engine;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use orbitflare_sdk::RpcClient;
+use solana_sdk::hash::Hash;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::message::Message;
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
@@ -32,6 +33,12 @@ pub fn serialize_tx(tx: &Transaction) -> Result<String, AppError> {
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
+pub async fn fetch_blockhash(rpc: &RpcClient) -> Result<Hash, AppError> {
+    let (blockhash, _) = rpc.get_latest_blockhash().await?;
+    Hash::from_str(&blockhash)
+        .map_err(|e| AppError::BadRequest(format!("Invalid blockhash from RPC: {e}")))
+}
+
 pub async fn build_memo_tx(
     rpc: &RpcClient,
     payer: &Pubkey,
@@ -42,7 +49,7 @@ pub async fn build_memo_tx(
         accounts: vec![AccountMeta::new_readonly(*payer, true)],
         data: memo.as_bytes().to_vec(),
     };
-    let blockhash = rpc.get_latest_blockhash().await?;
+    let blockhash = fetch_blockhash(rpc).await?;
     let msg = Message::new_with_blockhash(&[ix], Some(payer), &blockhash);
     serialize_tx(&Transaction::new_unsigned(msg))
 }

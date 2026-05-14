@@ -6,4 +6,6 @@ mod registry;
 mod utils;
 
 pub use registry::{Action, ActionRegistry};
-pub use utils::{build_memo_tx, get_param, lamports_to_sol, serialize_tx, sol_to_lamports};
+pub use utils::{
+    build_memo_tx, fetch_blockhash, get_param, lamports_to_sol, serialize_tx, sol_to_lamports,
+};

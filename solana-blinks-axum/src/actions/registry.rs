@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use orbitflare_sdk::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::{BTreeSet, HashMap};
 
