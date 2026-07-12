@@ -8,7 +8,7 @@ axum = "0.8.8"
 tokio = { version = "1.49", features = ["full"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-orbitflare-sdk = "0.2.2"
+orbitflare-sdk = "0.3.0"
 solana-sdk = "2.3.1"
 solana-system-interface = { version = "1.0.0", features = ["bincode"] }
 bincode = "1.3"
