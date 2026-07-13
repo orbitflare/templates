@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use orbitflare_sdk::grpc::TransactionFilter as GeyserTransactionFilter;
 use orbitflare_sdk::proto::geyser::{
-    CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots,
-    SubscribeRequestFilterTransactions, SubscribeRequestPing, SubscribeUpdateTransactionInfo,
-    subscribe_update::UpdateOneof,
+    CommitmentLevel, SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestPing,
+    SubscribeUpdateTransactionInfo, subscribe_update::UpdateOneof,
 };
 use orbitflare_sdk::{GeyserClientBuilder, GeyserStream};
 use tracing::{debug, error, info, warn};
@@ -50,18 +50,19 @@ impl YellowstoneStream {
     }
 
     fn build_subscribe_request(&self) -> SubscribeRequest {
+        let mut tx_filter = GeyserTransactionFilter::new()
+            .account_include(self.config.transactions.account_include.clone())
+            .account_exclude(self.config.transactions.account_exclude.clone())
+            .account_required(self.config.transactions.account_required.clone());
+        if let Some(vote) = self.config.transactions.vote {
+            tx_filter = tx_filter.vote(vote);
+        }
+        if let Some(failed) = self.config.transactions.failed {
+            tx_filter = tx_filter.failed(failed);
+        }
+
         let mut transactions = HashMap::new();
-        transactions.insert(
-            "default".to_string(),
-            SubscribeRequestFilterTransactions {
-                vote: self.config.transactions.vote,
-                failed: self.config.transactions.failed,
-                signature: None,
-                account_include: self.config.transactions.account_include.clone(),
-                account_exclude: self.config.transactions.account_exclude.clone(),
-                account_required: self.config.transactions.account_required.clone(),
-            },
-        );
+        transactions.insert("default".to_string(), tx_filter.into());
 
         let commitment = Self::parse_commitment(&self.config.commitment);
 

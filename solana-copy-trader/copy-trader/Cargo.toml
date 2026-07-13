@@ -8,7 +8,7 @@ name = "copy-trader"
 path = "src/main.rs"
 
 [dependencies]
-orbitflare-sdk = { version = "0.2.2", features = ["grpc", "jetstream", "ws"] }
+orbitflare-sdk = { version = "0.3.0", features = ["grpc", "jetstream", "ws"] }
 
 # Async runtime
 tokio.workspace = true

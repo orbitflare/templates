@@ -10,10 +10,10 @@ use crate::actions::swap::SwapAction;
 use crate::actions::transfer::TransferAction;
 use crate::actions::ActionRegistry;
 use crate::cors::actions_cors;
-use tower_http::trace::TraceLayer;
 use crate::error::AppError;
 use crate::register_actions;
 use crate::spec::{ActionGetResponse, ActionPostRequest, ActionPostResponse, ActionsJson};
+use tower_http::trace::TraceLayer;
 
 pub struct AppState {
     pub rpc: Arc<RpcClient>,
@@ -46,9 +46,17 @@ pub fn build_router(rpc: Arc<RpcClient>) -> Router {
                         uri = %req.uri(),
                     )
                 })
-                .on_response(|res: &axum::http::Response<_>, latency: std::time::Duration, _span: &tracing::Span| {
-                    tracing::info!(status = res.status().as_u16(), latency_ms = latency.as_millis(), "response");
-                }),
+                .on_response(
+                    |res: &axum::http::Response<_>,
+                     latency: std::time::Duration,
+                     _span: &tracing::Span| {
+                        tracing::info!(
+                            status = res.status().as_u16(),
+                            latency_ms = latency.as_millis(),
+                            "response"
+                        );
+                    },
+                ),
         )
         .with_state(state)
 }

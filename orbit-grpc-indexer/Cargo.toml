@@ -17,7 +17,7 @@ rust-version = "1.85"
 license = "MIT"
 
 [workspace.dependencies]
-orbitflare-sdk = { version = "0.2.2", features = ["grpc", "jetstream"] }
+orbitflare-sdk = { version = "0.3.0", features = ["grpc", "jetstream"] }
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-stream = "0.1.18"
 serde = { version = "1.0.228", features = ["derive"] }

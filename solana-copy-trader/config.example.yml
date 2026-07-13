@@ -1,4 +1,5 @@
-# Solana Copy Trader configuration. Environment variables expand as ${VAR_NAME}.
+# Solana Copy Trader configuration. Placeholders below are filled from
+# environment variables at load time.
 # Copy to config.yml and edit for your setup.
 
 jetstream:
