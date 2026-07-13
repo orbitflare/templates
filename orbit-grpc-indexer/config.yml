@@ -11,9 +11,6 @@ jetstream:
     account_include: []
     account_exclude: []
     account_required: []
-  accounts:
-    account: []
-    owner: []
 
 yellowstone:
   timeout_secs: 30

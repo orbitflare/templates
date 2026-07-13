@@ -26,8 +26,6 @@ pub struct JetstreamConfig {
     pub reconnect: ReconnectConfig,
     #[serde(default)]
     pub transactions: JetstreamTransactionFilter,
-    #[serde(default)]
-    pub accounts: JetstreamAccountFilter,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -38,14 +36,6 @@ pub struct JetstreamTransactionFilter {
     pub account_exclude: Vec<String>,
     #[serde(default)]
     pub account_required: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct JetstreamAccountFilter {
-    #[serde(default)]
-    pub account: Vec<String>,
-    #[serde(default)]
-    pub owner: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

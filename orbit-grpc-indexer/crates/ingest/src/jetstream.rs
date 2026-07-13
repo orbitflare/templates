@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
-use orbitflare_sdk::proto::jetstream::{
-    SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterTransactions,
-    SubscribeRequestPing, SubscribeUpdateTransactionInfo, subscribe_update::UpdateOneof,
+use orbitflare_sdk::jetstream::v2::{
+    JetstreamClientBuilder, TransactionFilter, TransactionStream as SdkJetstreamStream,
 };
-use orbitflare_sdk::{JetstreamClientBuilder, JetstreamStream as SdkJetstreamStream};
+use orbitflare_sdk::proto::jetstream::v2::{
+    TransactionMessage, TxFilter, subscribe_transactions_response::Payload,
+};
 use tracing::{debug, error, info, warn};
 
 use indexer_config::model::JetstreamConfig;
@@ -33,34 +32,14 @@ impl JetstreamStream {
         }
     }
 
-    fn build_subscribe_request(&self) -> SubscribeRequest {
-        let mut transactions = HashMap::new();
-        transactions.insert(
-            "default".to_string(),
-            SubscribeRequestFilterTransactions {
-                account_include: self.config.transactions.account_include.clone(),
-                account_exclude: self.config.transactions.account_exclude.clone(),
-                account_required: self.config.transactions.account_required.clone(),
-            },
-        );
-
-        let mut accounts = HashMap::new();
-        if !self.config.accounts.account.is_empty() || !self.config.accounts.owner.is_empty() {
-            accounts.insert(
-                "default".to_string(),
-                SubscribeRequestFilterAccounts {
-                    account: self.config.accounts.account.clone(),
-                    owner: self.config.accounts.owner.clone(),
-                    filters: vec![],
-                },
-            );
-        }
-
-        SubscribeRequest {
-            transactions,
-            accounts,
-            ping: Some(SubscribeRequestPing { id: 1 }),
-        }
+    fn build_filters(&self) -> Vec<TxFilter> {
+        vec![
+            TransactionFilter::new()
+                .account_include(self.config.transactions.account_include.clone())
+                .account_exclude(self.config.transactions.account_exclude.clone())
+                .account_required(self.config.transactions.account_required.clone())
+                .with_id("default"),
+        ]
     }
 
     fn establish_stream(&self) -> Result<SdkJetstreamStream> {
@@ -71,13 +50,13 @@ impl JetstreamStream {
             .build()
             .map_err(|e| IndexerError::Connection(format!("jetstream build failed: {e}")))?;
 
-        Ok(client.subscribe(self.build_subscribe_request()))
+        Ok(client.subscribe_transactions(self.build_filters()))
     }
 
-    fn parse_transaction(tx_info: SubscribeUpdateTransactionInfo, slot: u64) -> RawTransaction {
-        let signature = bs58::encode(&tx_info.signature).into_string();
+    fn parse_transaction(tx: TransactionMessage) -> RawTransaction {
+        let signature = bs58::encode(&tx.signature).into_string();
 
-        let account_keys: Vec<String> = tx_info
+        let account_keys: Vec<String> = tx
             .account_keys
             .iter()
             .filter(|k| k.len() == 32)
@@ -86,12 +65,12 @@ impl JetstreamStream {
 
         RawTransaction {
             signature,
-            slot,
+            slot: tx.slot,
             block_time: None,
             fee: None,
             success: true,
             err: None,
-            num_instructions: tx_info.instructions.len() as u32,
+            num_instructions: tx.instructions.len() as u32,
             account_keys,
             log_messages: vec![],
             inner_instructions: vec![],
@@ -104,7 +83,7 @@ impl JetstreamStream {
 #[async_trait]
 impl TransactionStream for JetstreamStream {
     async fn connect(&mut self) -> Result<()> {
-        info!(url = %self.url, "connecting to jetstream");
+        info!(url = %self.url, "connecting to jetstream (v2)");
         self.stream = Some(self.establish_stream()?);
         self.backoff.reset();
         info!("jetstream stream connected");
@@ -118,18 +97,27 @@ impl TransactionStream for JetstreamStream {
             .ok_or_else(|| IndexerError::Stream("jetstream not connected".into()))?;
 
         match stream.next().await {
-            Some(Ok(update)) => match update.update_oneof {
-                Some(UpdateOneof::Transaction(tx_update)) => {
-                    let slot = tx_update.slot;
-                    if let Some(tx_info) = tx_update.transaction {
-                        debug!(slot, "jetstream tx");
-                        Ok(Some(Self::parse_transaction(tx_info, slot)))
+            Some(Ok(resp)) => match resp.payload {
+                Some(Payload::Transaction(ft)) => {
+                    if let Some(tx) = ft.transaction {
+                        debug!(slot = tx.slot, "jetstream tx");
+                        Ok(Some(Self::parse_transaction(tx)))
                     } else {
                         Ok(None)
                     }
                 }
-                Some(UpdateOneof::Ping(_) | UpdateOneof::Pong(_)) => Ok(None),
-                _ => Ok(None),
+                Some(Payload::FilterValidation(result)) => {
+                    if !result.accepted {
+                        warn!(
+                            filter_id = %result.filter_id,
+                            reason = %result.rejection_reason,
+                            "jetstream rejected filter"
+                        );
+                    }
+                    Ok(None)
+                }
+                Some(Payload::Heartbeat(_) | Payload::Pong(_)) => Ok(None),
+                None => Ok(None),
             },
             Some(Err(e)) => {
                 error!(error = %e, "jetstream stream error");
