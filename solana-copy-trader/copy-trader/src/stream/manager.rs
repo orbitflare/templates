@@ -44,7 +44,10 @@ impl StreamManager {
 
         let filters = build_jetstream_filters(&self.config);
 
-        tracing::info!(filter_count = filters.len(), "Subscribing to Jetstream (v2)");
+        tracing::info!(
+            filter_count = filters.len(),
+            "Subscribing to Jetstream (v2)"
+        );
         let mut stream = client.subscribe_transactions(filters);
         tracing::info!("Connected to Jetstream, streaming transactions");
 

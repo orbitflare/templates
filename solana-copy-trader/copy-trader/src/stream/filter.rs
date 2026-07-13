@@ -23,11 +23,9 @@ pub fn build_jetstream_filters(config: &AppConfig) -> Vec<TxFilter> {
         enabled_targets.len()
     );
 
-    vec![
-        TransactionFilter::new()
-            .account_include(enabled_targets)
-            .with_id("copy_targets"),
-    ]
+    vec![TransactionFilter::new()
+        .account_include(enabled_targets)
+        .with_id("copy_targets")]
 }
 
 pub fn build_yellowstone_filters(
