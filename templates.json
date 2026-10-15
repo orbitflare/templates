@@ -44,5 +44,23 @@
       "# Optional frontend:",
       "cd frontend && npm install && npm run dev"
     ]
+  },
+  {
+    "name": "xark-solana-starter",
+    "description": "Zero-knowledge proofs in Rust: an xark circuit verified on-chain by Anchor and Pinocchio programs",
+    "lang": "rust",
+    "level": "advanced",
+    "tags": ["zk", "zero-knowledge", "groth16", "xark", "anchor", "pinocchio", "litesvm"],
+    "repo": "https://github.com/orbitflare/templates/tree/main/xark-solana-starter",
+    "setup_steps": [
+      "# Install xark, the Solana CLI, Anchor CLI 1.2.1 and just (see README.md)",
+      "just build",
+      "just test",
+      "# Run on a local validator:",
+      "solana-test-validator",
+      "just sync-ids",
+      "just deploy anchor",
+      "just demo anchor"
+    ]
   }
 ]
