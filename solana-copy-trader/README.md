@@ -27,7 +27,7 @@ flowchart TD
     G --> G1[Jupiter Quote]
     G1 --> G2[Position Sizing]
     G2 --> G3[Simulate tx]
-    G3 --> G4[Send tx / Jito bundle]
+    G3 --> G4[Send tx / Jito bundle / Apex]
     G4 --> G5[Confirm]
 
     G5 --> H[Output Layer]
@@ -45,7 +45,7 @@ The decoder tries top-level instructions first (the path Jetstream provides). If
 
 | Dependency               | Version  | Purpose                                              |
 |--------------------------|----------|------------------------------------------------------|
-| Rust                     | ≥ 1.83   | Build toolchain                                      |
+| Rust                     | ≥ 1.92   | Build toolchain                                      |
 | Docker & Compose         | ≥ 24.0   | Container orchestration                              |
 | OrbitFlare account       | —        | RPC API key (URL `?api_key=`); gRPC URLs for Jetstream and Yellowstone |
 | Solana keypair           | —        | Trader wallet (signs transactions)                   |
@@ -80,6 +80,8 @@ DATABASE_URL=postgres://copytrader:password@postgres:5432/copytrader
 ```
 
 Telegram push notifications are optional. Enable them by setting `notifications.telegram.enabled: true` in `config.yml` and adding `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` to `.env`.
+
+[OrbitFlare Apex](https://docs.orbitflare.com/apex) landing is optional. Set `APEX_API_KEY` in `.env` and live trades are sent through Apex over QUIC (HTTP fallback) with an `execution.apex.tip_lamports` tip (minimum 0.001 SOL) added to the swap transaction. Without it, trades go through RPC or Jito as before.
 
 ### 2. Run with Docker Compose
 
@@ -145,6 +147,7 @@ See [`config.example.yml`](config.example.yml) for the full annotated configurat
 | `sizing.mode` | `fixed`, `proportional`, `max_cap` |
 | `fees.strategy` | `dynamic`, `fixed`, `aggressive` |
 | `confirm.method` | `poll`, `websocket` |
+| `apex.region` | `global`, `fra`, `ams`, `dub`, `lon`, `nyc`, `slc`, `sgp`, `tyo`, `sqq` |
 | `log.format` | `json`, `pretty` |
 
 ---

@@ -218,6 +218,8 @@ pub struct ExecutionConfig {
     #[serde(default)]
     pub jito: JitoConfig,
     #[serde(default)]
+    pub apex: ApexConfig,
+    #[serde(default)]
     pub confirmation: ConfirmationConfig,
 }
 
@@ -303,6 +305,32 @@ impl Default for JitoConfig {
             enabled: false,
             tip_lamports: 50000,
             block_engine_url: "https://mainnet.block-engine.jito.wtf".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ApexConfig {
+    pub api_key: String,
+    pub region: String,
+    pub tip_lamports: u64,
+    pub mev_protect: bool,
+}
+
+impl ApexConfig {
+    pub fn is_enabled(&self) -> bool {
+        !self.api_key.is_empty()
+    }
+}
+
+impl Default for ApexConfig {
+    fn default() -> Self {
+        Self {
+            api_key: String::new(),
+            region: "fra".to_string(),
+            tip_lamports: orbitflare_apex::MIN_TIP_LAMPORTS,
+            mev_protect: false,
         }
     }
 }
@@ -587,6 +615,7 @@ pub fn validate_config(config: &AppConfig) -> anyhow::Result<()> {
     tracing::info!("  Targets: {}", config.targets.len());
     tracing::info!("  Dry run: {}", config.execution.dry_run);
     tracing::info!("  Sizing mode: {:?}", config.execution.sizing.mode);
+    tracing::info!("  Apex enabled: {}", config.execution.apex.is_enabled());
     tracing::info!("  Journal enabled: {}", config.journal.enabled);
     tracing::info!(
         "  Telegram enabled: {}",

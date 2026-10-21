@@ -1,6 +1,7 @@
 use clap::Parser;
 use copy_trader::config::{self, Cli, LogFormat};
 use copy_trader::decoder::DecoderPipeline;
+use copy_trader::execution::apex::ApexClient;
 use copy_trader::execution::engine::ExecutionEngine;
 use copy_trader::output::journal::TradeJournal;
 use copy_trader::output::metrics::{self, Metrics};
@@ -204,10 +205,17 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let apex = if config.execution.apex.is_enabled() && !config.execution.dry_run {
+        Some(ApexClient::connect(&config.execution.apex).await?)
+    } else {
+        None
+    };
+
     let engine = ExecutionEngine::new(
         config.clone(),
         redis.clone(),
         keypair,
+        apex,
         metrics.clone(),
         intent_receiver,
         record_sender.clone(),
