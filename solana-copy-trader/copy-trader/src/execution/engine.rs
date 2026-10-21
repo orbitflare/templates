@@ -1,4 +1,5 @@
 use crate::config::AppConfig;
+use crate::execution::apex::ApexClient;
 use crate::execution::jito::JitoClient;
 use crate::execution::jupiter_client::JupiterClient;
 use crate::execution::rpc_client::SolanaRpcClient;
@@ -9,6 +10,7 @@ use crate::state::redis::RedisClient;
 use crate::types::{Direction, Position, TradeIntent, TradeRecord, TradeStatus};
 use chrono::Utc;
 use solana_sdk::signature::{Keypair, Signer};
+use solana_sdk::transaction::VersionedTransaction;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
@@ -19,6 +21,7 @@ pub struct ExecutionEngine {
     jupiter: JupiterClient,
     rpc: SolanaRpcClient,
     jito: JitoClient,
+    apex: Option<ApexClient>,
     redis: Arc<RedisClient>,
     keypair: Option<Arc<Keypair>>,
     metrics: Arc<Metrics>,
@@ -33,6 +36,7 @@ impl ExecutionEngine {
         config: Arc<AppConfig>,
         redis: Arc<RedisClient>,
         keypair: Option<Arc<Keypair>>,
+        apex: Option<ApexClient>,
         metrics: Arc<Metrics>,
         intent_rx: mpsc::Receiver<TradeIntent>,
         record_tx: mpsc::Sender<TradeRecord>,
@@ -55,6 +59,7 @@ impl ExecutionEngine {
             jupiter,
             rpc,
             jito,
+            apex,
             redis,
             keypair,
             metrics,
@@ -281,15 +286,22 @@ impl ExecutionEngine {
             "Simulation passed"
         );
 
-        let send_result = if self.jito.is_enabled() {
+        let send_result = if let Some(apex) = &self.apex {
             match &self.keypair {
-                Some(kp) => match self.rpc.get_latest_blockhash().await {
-                    Ok(blockhash) => {
-                        self.jito
-                            .send_bundle(&swap_resp.swap_transaction, kp, blockhash)
-                            .await
+                Some(kp) => apex.send_transaction(&swap_resp.swap_transaction, kp).await,
+                None => Err(anyhow::anyhow!("No keypair available for Apex tip")),
+            }
+        } else if self.jito.is_enabled() {
+            match &self.keypair {
+                Some(kp) => match (
+                    sign_swap_transaction(&swap_resp.swap_transaction, kp),
+                    self.rpc.get_latest_blockhash().await,
+                ) {
+                    (Ok(signed), Ok(blockhash)) => {
+                        self.jito.send_bundle(&signed, kp, blockhash).await
                     }
-                    Err(e) => Err(anyhow::anyhow!(
+                    (Err(e), _) => Err(e),
+                    (_, Err(e)) => Err(anyhow::anyhow!(
                         "Failed to get blockhash for Jito tip: {}",
                         e
                     )),
@@ -297,7 +309,13 @@ impl ExecutionEngine {
                 None => Err(anyhow::anyhow!("No keypair available for Jito tip")),
             }
         } else {
-            self.rpc.send_transaction(&swap_resp.swap_transaction).await
+            match &self.keypair {
+                Some(kp) => match sign_swap_transaction(&swap_resp.swap_transaction, kp) {
+                    Ok(signed) => self.rpc.send_transaction(&signed).await,
+                    Err(e) => Err(e),
+                },
+                None => Err(anyhow::anyhow!("No keypair available to sign the swap")),
+            }
         };
 
         let our_tx_sig = match send_result {
@@ -447,4 +465,12 @@ impl ExecutionEngine {
             created_at: Utc::now(),
         }
     }
+}
+
+fn sign_swap_transaction(tx_base64: &str, keypair: &Keypair) -> anyhow::Result<String> {
+    use base64::Engine as _;
+    let engine = base64::engine::general_purpose::STANDARD;
+    let tx: VersionedTransaction = bincode::deserialize(&engine.decode(tx_base64)?)?;
+    let signed = VersionedTransaction::try_new(tx.message, &[keypair])?;
+    Ok(engine.encode(bincode::serialize(&signed)?))
 }

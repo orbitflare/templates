@@ -69,6 +69,12 @@ execution:
     tip_lamports: 50000
     block_engine_url: "https://mainnet.block-engine.jito.wtf"
 
+  apex:
+    api_key: "${APEX_API_KEY:-}"
+    region: "fra"
+    tip_lamports: 1000000
+    mev_protect: false
+
   confirmation:
     strategy: "poll"
     timeout_secs: 30
